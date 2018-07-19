@@ -1,3 +1,9 @@
+# custom
+.vscode
+libglua-example
+build_debug
+build_release
+
 # Prerequisites
 *.d
 
