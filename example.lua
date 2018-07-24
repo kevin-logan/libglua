@@ -1,32 +1,64 @@
-bound_class_1 = CreateExampleClass(1337)
-bound_class_2 = CreateExampleClass(10101)
+function example_sandboxed_environment()
+    function pretty_print_table(t, depth)
+        local depth_str = string.rep('\t', depth)
+        for key, value in pairs(t) do
+            if key ~= "_G" then -- _G has a reference to itself, don't recurse forever
+                if type(value) == "table" then
+                    print(depth_str .. key .. " {")
+                    pretty_print_table(value, depth + 1)
+                    print(depth_str .. "}")
+                else
+                    print(depth_str .. key .. ": " .. tostring(value))
+                end
+            end
+        end
+    end
 
-print("bound_class_1:GetValue() = " .. bound_class_1:GetValue())
-print("bound_class_2:GetValue() = " .. bound_class_2:GetValue())
+    print("sandboxed environment: ")
+    pretty_print_table(_G, 0)
+end
 
-bound_class_1:Increment(bound_class_2)
+function example_library_functions()
+    print("os.time() = " .. os.time())
+end
 
-print("post increment value = " .. bound_class_1:GetValue())
+function example_managed_cpp_class()
+    bound_class_1 = CreateExampleClass(1337)
+    bound_class_2 = CreateExampleClass(10101)
 
-print("example_binding('herp', 1337.1337) = " .. example_binding('herp', 1337.1337))
+    print("bound_class_1:GetValue() = " .. bound_class_1:GetValue())
+    print("bound_class_2:GetValue() = " .. bound_class_2:GetValue())
 
-print("global_boxed_value:GetValue() = " .. global_boxed_value:GetValue())
+    bound_class_1:Increment(bound_class_2)
 
-lua_constructed_boxed_value = ConstructBoxedValue()
-lua_constructed_boxed_value:SetValue(9999)
-print("lua_constructed_boxed_value:GetValue() = " .. lua_constructed_boxed_value:GetValue())
+    print("post increment value = " .. bound_class_1:GetValue())
+end
 
-function callable_from_cpp(int_arg, string_arg)
+function example_simple_binding()
+    print("example_binding('herp', 1337.1337) = " .. example_binding('herp', 1337.1337))
+end
+
+function example_global_value()
+    print("global_boxed_value:GetValue() = " .. global_boxed_value:GetValue())
+end
+
+function example_inferred_storage_cpp_class()
+    lua_constructed_boxed_value = ConstructBoxedValue()
+    lua_constructed_boxed_value:SetValue(9999)
+    print("lua_constructed_boxed_value:GetValue() = " .. lua_constructed_boxed_value:GetValue())
+end
+
+function example_callable_from_cpp(int_arg, string_arg)
     return "callable_from_cpp called with (" .. int_arg .. ", " .. string_arg .. ")", int_arg * 2
 end
 
-function reverse_array(arr)
+function example_reverse_array(arr)
     local reversed = {}
     local i = #arr
     local j = 1
 
     while i >= 1 do
-        reversed[j] = arr[i] 
+        reversed[j] = arr[i]
         j = j + 1
         i = i - 1
     end
@@ -34,6 +66,10 @@ function reverse_array(arr)
     return reversed;
 end
 
-function mutate_boxed_value(boxed_value)
+function example_mutate_value(boxed_value)
     boxed_value:SetValue(boxed_value:GetValue() * 1000)
+end
+
+function example_create_and_retrieve_global()
+    example_lua_global = "this global was created in lua"
 end

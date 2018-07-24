@@ -7,10 +7,11 @@ set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -gdwarf-2 -D_GLIBCX
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -g -gdwarf-2 -DNDEBUG")
 
 set(SOURCE_FILES
-    inc/exceptions.h
-    inc/file_util.h src/file_util.cpp
-    inc/icallable.h src/icallable.cpp
-    inc/luacallable.h src/luacallable.cpp
+    inc/Exceptions.h
+    inc/FileUtil.h src/FileUtil.cpp
+    inc/ICallable.h src/ICallable.cpp
+    inc/Glua.h inc/Glua.tcc src/Glua.cpp
+    inc/GluaCallable.h inc/GluaCallable.tcc
 )
 
 include_directories("${PROJECT_SOURCE_DIR}/inc")
