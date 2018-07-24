@@ -93,7 +93,14 @@ public:
         }
         else
         {
-            return m_functor();
+            if constexpr (std::is_same<ReturnType, void>::value)
+            {
+                m_functor();
+            }
+            else
+            {
+                ArgumentStack::push(this, m_functor());
+            }
         }
     }
 

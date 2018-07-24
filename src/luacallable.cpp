@@ -314,6 +314,14 @@ auto call_callable_from_lua(lua_State* state) -> int
     return callable_ptr->HasReturn() ? 1 : 0;
 }
 
+auto destruct_managed_type(lua_State* state) -> int
+{
+    IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(lua_touserdata(state, 1));
+    managed_type_ptr->~IManagedTypeStorage();
+
+    return 0;
+}
+
 auto remove_all_whitespace(std::string_view input) -> std::string
 {
     std::string output;

@@ -1,6 +1,6 @@
 # custom
 .vscode
-libglua-example
+libglua-examples
 build_debug
 build_release
 

@@ -53,10 +53,22 @@ public:
     auto Push(std::string value) -> void;
 
     template<typename T>
+    auto Push(const std::vector<T>& vector) -> void;
+
+    template<typename T>
     auto Push(T value) -> void;
 
     template<typename T>
+    auto PopArray() -> std::vector<T>;
+
+    template<typename T>
     auto Pop() -> T;
+
+    template<typename T>
+    auto SetGlobal(const std::string& name, T value) -> void;
+
+    template<typename T>
+    auto GetGlobal(const std::string& name) -> T;
 
     template<typename Functor, typename... Params>
     auto CreateLuaCallable(Functor&& f) -> Callable;
@@ -115,6 +127,7 @@ private:
 };
 
 auto call_callable_from_lua(lua_State* state) -> int;
+auto destruct_managed_type(lua_State* state) -> int;
 
 auto remove_all_whitespace(std::string_view input) -> std::string;
 auto split(std::string_view input, std::string_view token) -> std::vector<std::string_view>;
@@ -159,39 +172,338 @@ auto Lua::get(const ICallable* callable, int32_t stack_index) -> T
     }
 }
 
-template<typename T, typename = void>
-struct ManagedTypeHandler
+enum class ManagedTypeStorage
 {
-    static auto get(lua_State*, size_t) -> T { throw exceptions::LuaException("Tried to get value of unmanaged type"); }
+    RAW_PTR,
+    SHARED_PTR,
+    STACK_ALLOCATED
+};
 
-    static auto push(lua_State*, T) -> void { throw exceptions::LuaException("Tried to push value of unmanaged type"); }
+class IManagedTypeStorage
+{
+public:
+    virtual auto GetStorageType() const -> ManagedTypeStorage = 0;
+
+    virtual ~IManagedTypeStorage() = default;
 };
 
 template<typename T>
-struct ManagedTypeHandler<T*, std::void_t<decltype(std::declval<T*>()->shared_from_this())>>
+class ManagedTypeSharedPtr : public IManagedTypeStorage
+{
+public:
+    ManagedTypeSharedPtr(std::shared_ptr<T> value) : m_value(value) {}
+
+    auto GetStorageType() const -> ManagedTypeStorage override { return ManagedTypeStorage::SHARED_PTR; }
+
+    auto GetValue() const -> std::shared_ptr<const T> { return m_value; }
+    auto GetValue() -> std::shared_ptr<T> { return m_value; }
+
+    ~ManagedTypeSharedPtr() override = default;
+
+private:
+    std::shared_ptr<T> m_value;
+};
+
+template<typename T>
+class ManagedTypeRawPtr : public IManagedTypeStorage
+{
+public:
+    ManagedTypeRawPtr(T* value) : m_value(value) {}
+
+    auto GetStorageType() const -> ManagedTypeStorage override { return ManagedTypeStorage::RAW_PTR; }
+
+    auto GetValue() const -> const T* { return m_value; }
+    auto GetValue() -> T* { return m_value; }
+
+    ~ManagedTypeRawPtr() override = default; // we don't own the object, so we don't delete it
+
+private:
+    T* m_value;
+};
+
+template<typename T>
+class ManagedTypeStackAllocated : public IManagedTypeStorage
+{
+public:
+    ManagedTypeStackAllocated(T value) : m_value(std::move(value)) {}
+
+    auto GetStorageType() const -> ManagedTypeStorage override { return ManagedTypeStorage::STACK_ALLOCATED; }
+
+    auto GetValue() const -> const T& { return m_value; }
+    auto GetValue() -> T& { return m_value; }
+
+    ~ManagedTypeStackAllocated() override = default;
+
+private:
+    T m_value;
+};
+
+template<typename T, typename = void>
+struct ManagedTypeHandler
+{
+    static auto get(lua_State* state, size_t stack_index) -> T
+    {
+        if constexpr (std::is_copy_constructible<T>::value)
+        {
+            lua_getglobal(state, "LuaClass");
+            auto* lua_object = static_cast<Lua*>(lua_touserdata(state, -1));
+            lua_pop(state, 1);
+
+            auto metatable_name_opt = lua_object->GetMetatableName<T>();
+
+            if (metatable_name_opt.has_value())
+            {
+                IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
+                    luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+
+                if (managed_type_ptr != nullptr)
+                {
+                    switch (managed_type_ptr->GetStorageType())
+                    {
+                        case ManagedTypeStorage::RAW_PTR:
+                        {
+                            return *static_cast<ManagedTypeRawPtr<T>*>(managed_type_ptr)->GetValue();
+                        }
+                        break;
+                        case ManagedTypeStorage::SHARED_PTR:
+                        {
+                            return *static_cast<ManagedTypeSharedPtr<T>*>(managed_type_ptr)->GetValue();
+                        }
+                        break;
+                        case ManagedTypeStorage::STACK_ALLOCATED:
+                        {
+                            return static_cast<ManagedTypeStackAllocated<T>*>(managed_type_ptr)->GetValue();
+                        }
+                        break;
+                    }
+                }
+                else
+                {
+                    throw kdk::exceptions::LuaException("Tried to get type but invalid value at index!");
+                }
+            }
+            else
+            {
+                throw kdk::exceptions::LuaException("Tried to get type with no registered metatable!");
+            }
+        }
+        else
+        {
+            throw exceptions::LuaException("Tried to get value of unmanaged type");
+        }
+    }
+
+    static auto push(lua_State* state, T value) -> void
+    {
+        if constexpr (std::is_copy_constructible<T>::value)
+        {
+            lua_getglobal(state, "LuaClass");
+            auto* lua_object = static_cast<Lua*>(lua_touserdata(state, -1));
+            lua_pop(state, 1);
+
+            auto metatable_name_opt = lua_object->GetMetatableName<T>();
+
+            if (metatable_name_opt.has_value())
+            {
+                ManagedTypeStackAllocated<T>* managed_type_ptr = static_cast<ManagedTypeStackAllocated<T>*>(
+                    lua_newuserdata(state, sizeof(ManagedTypeStackAllocated<T>)));
+
+                managed_type_ptr = new (managed_type_ptr) ManagedTypeStackAllocated<T>{std::move(value)};
+
+                auto metatable_name = metatable_name_opt.value();
+
+                // set the metatable for this object
+                luaL_getmetatable(state, metatable_name.data());
+
+                if (lua_isnil(state, -1))
+                {
+                    lua_pop(state, 1);
+                    managed_type_ptr->~ManagedTypeStackAllocated<T>();
+
+                    throw std::runtime_error(
+                        "Pushing class type which has not been registered [null metatable]! " + metatable_name);
+                }
+                lua_setmetatable(state, -2);
+            }
+            else
+            {
+                throw std::runtime_error("Pushing class type which has not been registered [no metatable name]!");
+            }
+        }
+        else
+        {
+            throw exceptions::LuaException("Tried to push value of unmanaged type");
+        }
+    }
+}; // namespace kdk::lua
+
+template<typename T>
+struct ManagedTypeHandler<T*, void> // std::void_t<decltype(std::declval<T*>()->shared_from_this())>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> T*
     {
-        return ManagedTypeHandler<std::shared_ptr<T>>::get(state, stack_index).get();
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Lua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+
+        if (metatable_name_opt.has_value())
+        {
+            IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
+                luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+
+            if (managed_type_ptr != nullptr)
+            {
+                switch (managed_type_ptr->GetStorageType())
+                {
+                    case ManagedTypeStorage::RAW_PTR:
+                    {
+                        return static_cast<ManagedTypeRawPtr<T>*>(managed_type_ptr)->GetValue();
+                    }
+                    break;
+                    case ManagedTypeStorage::SHARED_PTR:
+                    {
+                        return static_cast<ManagedTypeSharedPtr<T>*>(managed_type_ptr)->GetValue().get();
+                    }
+                    break;
+                    case ManagedTypeStorage::STACK_ALLOCATED:
+                    {
+                        return &static_cast<ManagedTypeStackAllocated<T>*>(managed_type_ptr)->GetValue();
+                    }
+                    break;
+                }
+            }
+            else
+            {
+                throw kdk::exceptions::LuaException("Tried to get type but invalid value at index!");
+            }
+        }
+        else
+        {
+            throw kdk::exceptions::LuaException("Tried to get type with no registered metatable!");
+        }
     }
 
     static auto push(lua_State* state, T* value) -> void
     {
-        ManagedTypeHandler<std::shared_ptr<T>>::push(state, value->shared_from_this());
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Lua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+
+        if (metatable_name_opt.has_value())
+        {
+            ManagedTypeRawPtr<T>* managed_type_ptr =
+                static_cast<ManagedTypeRawPtr<T>*>(lua_newuserdata(state, sizeof(ManagedTypeRawPtr<T>)));
+
+            managed_type_ptr = new (managed_type_ptr) ManagedTypeRawPtr<T>{value};
+
+            auto metatable_name = metatable_name_opt.value();
+
+            // set the metatable for this object
+            luaL_getmetatable(state, metatable_name.data());
+
+            if (lua_isnil(state, -1))
+            {
+                lua_pop(state, 1);
+                managed_type_ptr->~ManagedTypeRawPtr<T>();
+
+                throw std::runtime_error(
+                    "Pushing class type which has not been registered [null metatable]! " + metatable_name);
+            }
+            lua_setmetatable(state, -2);
+        }
+        else
+        {
+            throw std::runtime_error("Pushing class type which has not been registered [no metatable name]!");
+        }
     }
 };
 
 template<typename T>
-struct ManagedTypeHandler<T&, std::void_t<decltype(std::declval<T&>().shared_from_this())>>
+struct ManagedTypeHandler<T&, void> // std::void_t<decltype(std::declval<T&>().shared_from_this())>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> T&
     {
-        return *ManagedTypeHandler<std::shared_ptr<T>>::get(state, stack_index);
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Lua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+
+        if (metatable_name_opt.has_value())
+        {
+            IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
+                luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+
+            if (managed_type_ptr != nullptr)
+            {
+                switch (managed_type_ptr->GetStorageType())
+                {
+                    case ManagedTypeStorage::RAW_PTR:
+                    {
+                        return *static_cast<ManagedTypeRawPtr<T>*>(managed_type_ptr)->GetValue();
+                    }
+                    break;
+                    case ManagedTypeStorage::SHARED_PTR:
+                    {
+                        return *static_cast<ManagedTypeSharedPtr<T>*>(managed_type_ptr)->GetValue();
+                    }
+                    break;
+                    case ManagedTypeStorage::STACK_ALLOCATED:
+                    {
+                        return static_cast<ManagedTypeStackAllocated<T>*>(managed_type_ptr)->GetValue();
+                    }
+                    break;
+                }
+            }
+            else
+            {
+                throw kdk::exceptions::LuaException("Tried to get type but invalid value at index!");
+            }
+        }
+        else
+        {
+            throw kdk::exceptions::LuaException("Tried to get type with no registered metatable!");
+        }
     }
 
     static auto push(lua_State* state, T& value) -> void
     {
-        ManagedTypeHandler<std::shared_ptr<T>>::push(state, value.shared_from_this());
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Lua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+
+        if (metatable_name_opt.has_value())
+        {
+            ManagedTypeRawPtr<T>* managed_type_ptr =
+                static_cast<ManagedTypeRawPtr<T>*>(lua_newuserdata(state, sizeof(ManagedTypeRawPtr<T>)));
+
+            managed_type_ptr = new (managed_type_ptr) ManagedTypeRawPtr<T>{&value};
+
+            auto metatable_name = metatable_name_opt.value();
+
+            // set the metatable for this object
+            luaL_getmetatable(state, metatable_name.data());
+
+            if (lua_isnil(state, -1))
+            {
+                lua_pop(state, 1);
+                managed_type_ptr->~ManagedTypeRawPtr<T>();
+
+                throw std::runtime_error(
+                    "Pushing class type which has not been registered [null metatable]! " + metatable_name);
+            }
+            lua_setmetatable(state, -2);
+        }
+        else
+        {
+            throw std::runtime_error("Pushing class type which has not been registered [no metatable name]!");
+        }
     }
 };
 
@@ -206,16 +518,30 @@ struct ManagedTypeHandler<std::shared_ptr<T>>
 
         auto metatable_name_opt = lua_object->GetMetatableName<T>();
 
-        auto* shared_ptr_ptr = static_cast<std::shared_ptr<T>**>(
-            luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
-
-        if (shared_ptr_ptr != nullptr)
+        if (metatable_name_opt.has_value())
         {
-            return **shared_ptr_ptr;
+            IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
+                luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+
+            if (managed_type_ptr != nullptr)
+            {
+                if (managed_type_ptr->GetStorageType() == ManagedTypeStorage::SHARED_PTR)
+                {
+                    return static_cast<ManagedTypeSharedPtr<T>*>(managed_type_ptr)->GetValue();
+                }
+                else
+                {
+                    throw kdk::exceptions::LuaException("Tried to get shared pointer of type but invalid value at index!");
+                }
+            }
+            else
+            {
+                throw kdk::exceptions::LuaException("Tried to get type but invalid value at index!");
+            }
         }
         else
         {
-            throw kdk::exceptions::LuaException("Tried to get type but invalid value at index!");
+            throw kdk::exceptions::LuaException("Tried to get type with no registered metatable!");
         }
     }
 
@@ -227,12 +553,13 @@ struct ManagedTypeHandler<std::shared_ptr<T>>
 
         auto metatable_name_opt = lua_object->GetMetatableName<T>();
 
-        if (metatable_name_opt)
+        if (metatable_name_opt.has_value())
         {
-            auto shared_ptr_ptr_ptr =
-                static_cast<std::shared_ptr<T>**>(lua_newuserdata(state, sizeof(std::shared_ptr<T>*)));
+            ManagedTypeSharedPtr<T>* managed_type_ptr =
+                static_cast<ManagedTypeSharedPtr<T>*>(lua_newuserdata(state, sizeof(ManagedTypeSharedPtr<T>)));
 
-            *shared_ptr_ptr_ptr = new std::shared_ptr<T>{value};
+            managed_type_ptr = new (managed_type_ptr) ManagedTypeSharedPtr<T>{value};
+
             auto metatable_name = metatable_name_opt.value();
 
             // set the metatable for this object
@@ -241,7 +568,7 @@ struct ManagedTypeHandler<std::shared_ptr<T>>
             if (lua_isnil(state, -1))
             {
                 lua_pop(state, 1);
-                delete *shared_ptr_ptr_ptr;
+                managed_type_ptr->~ManagedTypeSharedPtr<T>();
 
                 throw std::runtime_error(
                     "Pushing class type which has not been registered [null metatable]! " + metatable_name);
@@ -250,7 +577,92 @@ struct ManagedTypeHandler<std::shared_ptr<T>>
         }
         else
         {
-            throw std::runtime_error("Puhsing class type which has not been registered [no metatable name]!");
+            throw std::runtime_error("Pushing class type which has not been registered [no metatable name]!");
+        }
+    }
+};
+
+template<typename T>
+struct ManagedTypeHandler<std::reference_wrapper<T>, void>
+{
+    static auto get(lua_State* state, int32_t stack_index) -> std::reference_wrapper<T>
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Lua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+
+        if (metatable_name_opt.has_value())
+        {
+            IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
+                luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+
+            if (managed_type_ptr != nullptr)
+            {
+                switch (managed_type_ptr->GetStorageType())
+                {
+                    case ManagedTypeStorage::RAW_PTR:
+                    {
+                        return std::ref(*static_cast<ManagedTypeRawPtr<T>*>(managed_type_ptr)->GetValue());
+                    }
+                    break;
+                    case ManagedTypeStorage::SHARED_PTR:
+                    {
+                        return std::ref(*static_cast<ManagedTypeSharedPtr<T>*>(managed_type_ptr)->GetValue());
+                    }
+                    break;
+                    case ManagedTypeStorage::STACK_ALLOCATED:
+                    {
+                        return std::ref(static_cast<ManagedTypeStackAllocated<T>*>(managed_type_ptr)->GetValue());
+                    }
+                    break;
+                }
+            }
+            else
+            {
+                throw kdk::exceptions::LuaException("Tried to get type but invalid value at index!");
+            }
+        }
+        else
+        {
+            throw kdk::exceptions::LuaException("Tried to get type with no registered metatable!");
+        }
+    }
+
+    static auto push(lua_State* state, std::reference_wrapper<T> value) -> void
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Lua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+
+        if (metatable_name_opt.has_value())
+        {
+            ManagedTypeRawPtr<T>* managed_type_ptr =
+                static_cast<ManagedTypeRawPtr<T>*>(lua_newuserdata(state, sizeof(ManagedTypeRawPtr<T>)));
+
+            managed_type_ptr = new (managed_type_ptr) ManagedTypeRawPtr<T>{&value.get()};
+
+            auto metatable_name = metatable_name_opt.value();
+
+            // set the metatable for this object
+            luaL_getmetatable(state, metatable_name.data());
+
+            if (lua_isnil(state, -1))
+            {
+                lua_pop(state, 1);
+                managed_type_ptr->~ManagedTypeRawPtr<T>();
+
+                throw std::runtime_error(
+                    "Pushing class type which has not been registered [null metatable]! " + metatable_name);
+            }
+            lua_setmetatable(state, -2);
+        }
+        else
+        {
+            throw std::runtime_error("Pushing class type which has not been registered [no metatable name]!");
         }
     }
 };
@@ -315,9 +727,51 @@ template<>
 auto Lua::get(lua_State* lua, int32_t stack_index) -> std::string_view;
 
 template<typename T>
+auto Lua::Push(const std::vector<T>& arr) -> void
+{
+    auto size = arr.size();
+    lua_createtable(m_lua, size, 0);
+    for (size_t i = 0; i < size; ++i)
+    {
+        lua_pushinteger(m_lua, static_cast<lua_Integer>(i + 1)); // lua arrays 1 based
+        Push(arr[i]);
+
+        lua_settable(m_lua, -3);
+    }
+}
+
+template<typename T>
 auto Lua::Push(T value) -> void
 {
     return ManagedTypeHandler<T>::push(m_lua, std::move(value));
+}
+
+template<typename T>
+auto Lua::PopArray() -> std::vector<T>
+{
+    if (lua_istable(m_lua, -1))
+    {
+        std::vector<T> result;
+
+        size_t length = lua_objlen(m_lua, -1);
+
+        result.reserve(length);
+
+        for (size_t i = 0; i < length; ++i)
+        {
+            // get our value onto the stack...
+            lua_pushinteger(m_lua, static_cast<lua_Integer>(i + 1)); // lua arrays 1 based
+            lua_gettable(m_lua, -2);
+
+            result.emplace_back(Pop<T>());
+        }
+
+        return result;
+    }
+    else
+    {
+        throw exceptions::LuaException("Attempted to pop array off stack but top of stack wasn't a table");
+    }
 }
 
 template<typename T>
@@ -327,6 +781,20 @@ auto Lua::Pop() -> T
     lua_pop(m_lua, 1);
 
     return val;
+}
+
+template<typename T>
+auto Lua::SetGlobal(const std::string& name, T value) -> void
+{
+    Push(std::move(value));
+    lua_setglobal(m_lua, name.data());
+}
+
+template<typename T>
+auto Lua::GetGlobal(const std::string& name) -> T
+{
+    lua_getglobal(m_lua, name.data());
+    return Pop<T>();
 }
 
 template<typename Functor, typename... Params>
@@ -409,16 +877,6 @@ auto Lua::RegisterClassMultiString(std::string_view method_names, Methods... met
     RegisterClass<ClassType>(method_names_vector, std::move(methods_vector));
 }
 
-template<typename T>
-auto destruct_shared_ptr_ptr(lua_State* state) -> int
-{
-    auto shared_ptr_ptr_ptr = static_cast<std::shared_ptr<T>**>(lua_touserdata(state, 1));
-
-    delete *shared_ptr_ptr_ptr;
-
-    return 0;
-}
-
 template<typename T, typename = void>
 struct HasCreate : std::false_type
 {
@@ -428,6 +886,12 @@ template<typename T>
 struct HasCreate<T, std::void_t<decltype(T::Create)>> : std::true_type
 {
 };
+
+template<typename T>
+auto default_construct_type() -> T
+{
+    return T{};
+}
 
 template<typename ClassType, typename... Methods>
 auto Lua::RegisterClass(std::vector<std::string_view> method_names, std::vector<std::unique_ptr<ICallable>> methods)
@@ -492,7 +956,7 @@ auto Lua::RegisterClass(std::vector<std::string_view> method_names, std::vector<
         luaL_newmetatable(m_lua, class_name.data());
 
         lua_pushstring(m_lua, "__gc");
-        lua_pushcfunction(m_lua, &destruct_shared_ptr_ptr<ClassType>);
+        lua_pushcfunction(m_lua, &destruct_managed_type);
         lua_settable(m_lua, -3);
 
         auto  pos_pair     = m_method_registry.emplace(class_name, std::move(method_callables));
@@ -520,6 +984,12 @@ auto Lua::RegisterClass(std::vector<std::string_view> method_names, std::vector<
         {
             auto create_callable = CreateLuaCallable(&ClassType::Create);
             RegisterCallable("Create" + class_name, std::move(create_callable));
+        }
+
+        if constexpr (std::is_default_constructible<ClassType>::value)
+        {
+            auto construct_callable = CreateLuaCallable(&default_construct_type<ClassType>);
+            RegisterCallable("Construct" + class_name, std::move(construct_callable));
         }
     }
 }
