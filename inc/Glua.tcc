@@ -87,7 +87,12 @@ struct ManagedTypeHandler
 {
     static auto get(lua_State* state, size_t stack_index) -> T
     {
-        if constexpr (std::is_copy_constructible<T>::value)
+        if constexpr (std::is_enum<T>::value)
+        {
+            // lua treats as number
+            return static_cast<T>(lua_tonumber(state, stack_index));
+        }
+        else if constexpr (std::is_copy_constructible<T>::value)
         {
             lua_getglobal(state, "LuaClass");
             auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
@@ -139,7 +144,12 @@ struct ManagedTypeHandler
 
     static auto push(lua_State* state, T value) -> void
     {
-        if constexpr (std::is_copy_constructible<T>::value)
+        if constexpr (std::is_enum<T>::value)
+        {
+            // lua treats as number
+            lua_pushnumber(state, static_cast<lua_Number>(value));
+        }
+        else if constexpr (std::is_copy_constructible<T>::value)
         {
             lua_getglobal(state, "LuaClass");
             auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));

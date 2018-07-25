@@ -160,6 +160,37 @@ auto example_create_and_retrieve_global(kdk::glua::Glua::Ptr glua) -> void
     std::cout << "glua global example_lua_global: " << glua->GetGlobal<std::string>("example_lua_global") << std::endl;
 }
 
+enum class ExampleEnum
+{
+    ONE   = 1,
+    TWO   = 2,
+    RED   = 3,
+    BLACK = 4
+};
+auto example_enumeration(kdk::glua::Glua::Ptr glua) -> void
+{
+    std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
+
+    glua->CallScriptFunction("example_enumeration", ExampleEnum::BLACK);
+    auto ret_val = glua->Pop<ExampleEnum>();
+
+    switch (ret_val)
+    {
+        case ExampleEnum::ONE:
+            std::cout << "received ONE" << std::endl;
+            break;
+        case ExampleEnum::TWO:
+            std::cout << "received TWO" << std::endl;
+            break;
+        case ExampleEnum::RED:
+            std::cout << "received RED" << std::endl;
+            break;
+        case ExampleEnum::BLACK:
+            std::cout << "received BLACK" << std::endl;
+            break;
+    }
+}
+
 auto main(int argc, char* argv[]) -> int
 {
     auto glua = kdk::glua::Glua::Create(std::cout);
@@ -195,6 +226,7 @@ auto main(int argc, char* argv[]) -> int
         example_reverse_array(glua);
         example_mutate_value(glua);
         example_create_and_retrieve_global(glua);
+        example_enumeration(glua);
     }
 
     return 0;

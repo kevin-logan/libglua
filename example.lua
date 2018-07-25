@@ -79,3 +79,9 @@ end
 function example_create_and_retrieve_global()
     example_lua_global = "this global was created in lua"
 end
+
+function example_enumeration(enum_value)
+    print("Received enum value: " .. enum_value)
+
+    return 1
+end
