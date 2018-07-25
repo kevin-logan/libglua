@@ -110,6 +110,8 @@ public:
     template<typename T>
     auto SetMetatableName(std::string metatable_name) -> void;
 
+    auto ResetEnvironment() -> void;
+
     ~Glua();
 
 private:

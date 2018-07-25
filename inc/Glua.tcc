@@ -683,10 +683,10 @@ auto Glua::CallScriptFunction(const std::string& function_name, Params&&... para
     if (!lua_isfunction(m_lua, -1))
     {
         throw exceptions::LuaException(
-            "Attempted to call lua script function" + function_name + " which was not a function");
+            "Attempted to call lua script function " + function_name + " which was not a function");
     }
 
-    lua_getglobal(m_lua, "__libglua__sandbox__");
+    lua_getglobal(m_lua, "__libglua__env__");
     lua_setfenv(m_lua, -2);
 
     // push all params onto the lua stack
@@ -694,7 +694,8 @@ auto Glua::CallScriptFunction(const std::string& function_name, Params&&... para
 
     if (lua_pcall(m_lua, sizeof...(Params), LUA_MULTRET, 0))
     {
-        throw exceptions::LuaException("Failed to call lua script function: " + function_name);
+        throw exceptions::LuaException(
+            "Failed to call lua script function [" + function_name + "]: " + lua_tostring(m_lua, -1));
     }
 }
 

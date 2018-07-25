@@ -193,7 +193,7 @@ auto Glua::RunScript(std::string_view script_data) -> void
 
     if (!code)
     {
-        lua_getglobal(m_lua, "__libglua__sandbox__");
+        lua_getglobal(m_lua, "__libglua__env__");
         lua_setfenv(m_lua, -2);
         code = lua_pcall(m_lua, 0, 0, 0);
 
@@ -223,14 +223,15 @@ auto Glua::CallScriptFunction(const std::string& function_name) -> void
     if (!lua_isfunction(m_lua, -1))
     {
         throw exceptions::LuaException(
-            "Attempted to call lua script function" + function_name + " which was not a function");
+            "Attempted to call lua script function " + function_name + " which was not a function");
     }
 
-    lua_getglobal(m_lua, "__libglua__sandbox__");
+    lua_getglobal(m_lua, "__libglua__env__");
     lua_setfenv(m_lua, -2);
     if (lua_pcall(m_lua, 0, LUA_MULTRET, 0))
     {
-        throw exceptions::LuaException("Failed to call lua script function: " + function_name);
+        throw exceptions::LuaException(
+            "Failed to call lua script function [" + function_name + "]: " + lua_tostring(m_lua, -1));
     }
 }
 
@@ -266,6 +267,20 @@ auto Glua::GetLuaState() -> lua_State*
 auto Glua::GetLuaState() const -> const lua_State*
 {
     return m_lua;
+}
+
+auto Glua::ResetEnvironment() -> void
+{
+    lua_getglobal(m_lua, "__libglua__sandbox__");
+
+    lua_newtable(m_lua);               // env
+    lua_pushvalue(m_lua, -1);          // env -> env
+    lua_pushliteral(m_lua, "__index"); // env -> env -> __index
+    lua_pushvalue(m_lua, -4);          // push __libglua__sandbox__, env -> env -> __index -> sandbox
+    lua_settable(m_lua, -3);           // env -> env
+    lua_setmetatable(m_lua, -2);       // env
+
+    lua_setglobal(m_lua, "__libglua__env__");
 }
 
 Glua::~Glua()
@@ -380,13 +395,16 @@ Glua::Glua(std::ostream& output_stream) : m_lua(luaL_newstate()), m_output_strea
 
     lua_setglobal(m_lua, "__libglua__sandbox__");
 
+    // now that sandbox is set up, reset environment
+    ResetEnvironment();
+
     lua_pushlightuserdata(m_lua, this);
     lua_setglobal(m_lua, "LuaClass");
 }
 
 auto Glua::get_global_onto_stack(const std::string& global_name) -> void
 {
-    lua_getglobal(m_lua, "__libglua__sandbox__");
+    lua_getglobal(m_lua, "__libglua__env__");
     lua_pushlstring(m_lua, global_name.data(), global_name.size());
 
     lua_gettable(m_lua, -2);
@@ -396,7 +414,7 @@ auto Glua::get_global_onto_stack(const std::string& global_name) -> void
 
 auto Glua::set_global_from_stack(const std::string& global_name) -> void
 {
-    lua_getglobal(m_lua, "__libglua__sandbox__");
+    lua_getglobal(m_lua, "__libglua__env__");
     lua_pushlstring(m_lua, global_name.data(), global_name.size());
     lua_pushvalue(m_lua, -3); // get value from original stack back into position
 

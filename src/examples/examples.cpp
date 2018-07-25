@@ -57,10 +57,18 @@ auto some_func(BoxedValue& derp) -> void
     std::cout << __PRETTY_FUNCTION__ << " called with " << derp.GetValue() << std::endl;
 }
 
-auto example_sandboxed_environment(kdk::glua::Glua::Ptr glua) -> void
+auto example_sandboxed_environment(kdk::glua::Glua::Ptr glua, const std::string& script) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
+    glua->CallScriptFunction("example_sandboxed_environment");
+    glua->CallScriptFunction("example_sandboxed_environment");
+
+    std::cout << __FUNCTION__ << " reset glua environment" << std::endl;
+    glua->ResetEnvironment();
+
+    glua->RunScript(script);
+    glua->CallScriptFunction("example_sandboxed_environment");
     glua->CallScriptFunction("example_sandboxed_environment");
 }
 
@@ -177,7 +185,7 @@ auto main(int argc, char* argv[]) -> int
 
         glua->RunScript(script);
 
-        example_sandboxed_environment(glua);
+        example_sandboxed_environment(glua, script);
         example_library_functions(glua);
         example_managed_cpp_class(glua);
         example_simple_binding(glua);

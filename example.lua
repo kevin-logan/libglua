@@ -14,8 +14,14 @@ function example_sandboxed_environment()
         end
     end
 
-    print("sandboxed environment: ")
-    pretty_print_table(_G, 0)
+    if been_here_before == nil then
+        print("fresh sandboxed environment: ")
+        been_here_before = true
+    else
+        print("re-used sandboxed environment: ")
+    end
+
+    pretty_print_table(_G, 1)
 end
 
 function example_library_functions()
