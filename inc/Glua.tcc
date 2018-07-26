@@ -90,7 +90,7 @@ struct ManagedTypeHandler
 };
 
 template<typename T>
-struct ManagedTypeHandler<T*, void>
+struct ManagedTypeHandler<T*, std::enable_if_t<!HasCustomHandler<T>::value>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> T*
     {
@@ -359,7 +359,7 @@ struct ManagedTypeHandler<std::optional<T>>
 }; // namespace kdk::glua
 
 template<typename T>
-struct ManagedTypeHandler<std::shared_ptr<T>>
+struct ManagedTypeHandler<std::shared_ptr<T>, std::enable_if_t<!HasCustomHandler<T>::value>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> std::shared_ptr<T>
     {
@@ -434,7 +434,7 @@ struct ManagedTypeHandler<std::shared_ptr<T>>
 };
 
 template<typename T>
-struct ManagedTypeHandler<std::reference_wrapper<T>, void>
+struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<!HasCustomHandler<T>::value>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> std::reference_wrapper<T>
     {
@@ -534,7 +534,7 @@ struct ManagedTypeHandler<T, std::enable_if_t<std::is_enum<T>::value && !HasType
 };
 
 template<typename T>
-struct ManagedTypeHandler<T, std::enable_if_t<HasCustomGet<T>::value && HasCustomPush<T>::value>>
+struct ManagedTypeHandler<T, std::enable_if_t<HasCustomHandler<T>::value>>
 {
     static auto get(lua_State* state, size_t stack_index) -> T { return CustomTypeHandler<T>::get(state, stack_index); }
     static auto push(lua_State* state, T value) -> void { CustomTypeHandler<T>::push(state, std::move(value)); }
@@ -544,8 +544,7 @@ template<typename T>
 struct ManagedTypeHandler<
     T,
     std::enable_if_t<
-        std::is_copy_constructible<T>::value && !std::is_enum<T>::value && !HasTypeHandler<T>::value &&
-        (!HasCustomGet<T>::value || !HasCustomPush<T>::value)>>
+        std::is_copy_constructible<T>::value && !std::is_enum<T>::value && !HasTypeHandler<T>::value && !HasCustomHandler<T>::value>>
 {
     static auto get(lua_State* state, size_t stack_index) -> T
     {

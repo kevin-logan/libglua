@@ -220,6 +220,16 @@ struct HasCustomPush<T, std::void_t<decltype(CustomTypeHandler<T>::push(std::dec
 {
 };
 
+template<typename T, typename = void>
+struct HasCustomHandler : std::false_type
+{
+};
+
+template<typename T>
+struct HasCustomHandler<T, std::enable_if_t<HasCustomGet<T>::value && HasCustomPush<T>::value>> : std::true_type
+{
+};
+
 } // namespace kdk::glua
 
 #include "Glua.tcc"
