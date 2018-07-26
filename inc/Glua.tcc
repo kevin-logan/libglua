@@ -82,6 +82,13 @@ private:
     T m_value;
 };
 
+template<typename T, typename = void>
+struct ManagedTypeHandler
+{
+    static auto get(lua_State*, size_t) -> T { throw exceptions::LuaException("Tried to get value of unmanaged type"); }
+    static auto push(lua_State*, T) -> void { throw exceptions::LuaException("Tried to push value of unmanaged type"); }
+};
+
 template<typename T>
 struct ManagedTypeHandler<T*, void>
 {
@@ -529,8 +536,8 @@ struct ManagedTypeHandler<T, std::enable_if_t<std::is_enum<T>::value && !HasType
 template<typename T>
 struct ManagedTypeHandler<T, std::enable_if_t<HasCustomGet<T>::value && HasCustomPush<T>::value>>
 {
-    static auto get(lua_State* state, size_t stack_index) -> T { return T::glua_get(state, stack_index); }
-    static auto push(lua_State* state, T value) -> void { T::glua_push(state, std::move(value)); }
+    static auto get(lua_State* state, size_t stack_index) -> T { return CustomTypeHandler<T>::get(state, stack_index); }
+    static auto push(lua_State* state, T value) -> void { CustomTypeHandler<T>::push(state, std::move(value)); }
 };
 
 template<typename T>
@@ -726,7 +733,7 @@ auto Glua::CreateLuaCallable(ReturnType (*callable)(Params...)) -> Callable
 template<typename ClassType, typename ReturnType, typename... Params>
 auto Glua::CreateLuaCallable(ReturnType (ClassType::*callable)(Params...) const) -> Callable
 {
-    auto method_call_lambda = [callable](const ClassType& object, Params... params) {
+    auto method_call_lambda = [callable](const ClassType& object, Params... params) -> ReturnType {
         return (object.*callable)(std::forward<Params>(params)...);
     };
 
@@ -737,7 +744,7 @@ auto Glua::CreateLuaCallable(ReturnType (ClassType::*callable)(Params...) const)
 template<typename ClassType, typename ReturnType, typename... Params>
 auto Glua::CreateLuaCallable(ReturnType (ClassType::*callable)(Params...)) -> Callable
 {
-    auto method_call_lambda = [callable](ClassType& object, Params... params) {
+    auto method_call_lambda = [callable](ClassType& object, Params... params) -> ReturnType {
         return (object.*callable)(std::forward<Params>(params)...);
     };
 

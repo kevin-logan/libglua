@@ -210,12 +210,21 @@ public:
 
     auto GetValue() const -> const ValueType& { return m_value; }
 
-    static auto glua_get(lua_State* state, size_t stack_index) -> TemplateExample<ClassType, ValueType>
+private:
+    ValueType m_value;
+};
+
+namespace kdk::glua
+{
+template<typename ClassType, typename ValueType>
+struct CustomTypeHandler<TemplateExample<ClassType, ValueType>>
+{
+    static auto get(lua_State* state, size_t stack_index) -> TemplateExample<ClassType, ValueType>
     {
         // get as value type
         return TemplateExample<ClassType, ValueType>{kdk::glua::Glua::get<ValueType>(state, stack_index)};
     }
-    static auto glua_push(lua_State* state, TemplateExample<ClassType, ValueType> value) -> void
+    static auto push(lua_State* state, TemplateExample<ClassType, ValueType> value) -> void
     {
         // get as value type
         lua_getglobal(state, "LuaClass");
@@ -224,10 +233,9 @@ public:
 
         lua_object->Push(value.GetValue());
     }
-
-private:
-    ValueType m_value;
 };
+} // namespace kdk::glua
+
 static auto example_custom_template_binding(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;

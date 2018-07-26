@@ -134,9 +134,10 @@ auto split(std::string_view input, std::string_view token) -> std::vector<std::s
 
 // specialize this type with your type to add custom handling
 template<typename T, typename = void>
-struct ManagedTypeHandler
+struct CustomTypeHandler
 {
-    static auto get(lua_State* state, size_t stack_index) -> T
+    // implement these static functions in your specialization to allow your custom type
+    /*static auto get(lua_State* state, size_t stack_index) -> T
     {
         (void)state;
         (void)stack_index;
@@ -147,7 +148,7 @@ struct ManagedTypeHandler
         (void)state;
         (void)value;
         throw exceptions::LuaException("Tried to push value of unmanaged type");
-    }
+    }*/
 };
 
 template<typename T>
@@ -203,7 +204,7 @@ struct HasCustomGet : std::false_type
 };
 
 template<typename T>
-struct HasCustomGet<T, std::void_t<decltype(T::glua_get(std::declval<lua_State*>(), std::declval<size_t>()))>>
+struct HasCustomGet<T, std::void_t<decltype(CustomTypeHandler<T>::get(std::declval<lua_State*>(), std::declval<size_t>()))>>
     : std::true_type
 {
 };
@@ -214,7 +215,7 @@ struct HasCustomPush : std::false_type
 };
 
 template<typename T>
-struct HasCustomPush<T, std::void_t<decltype(T::glua_push(std::declval<lua_State*>(), std::declval<T>()))>>
+struct HasCustomPush<T, std::void_t<decltype(CustomTypeHandler<T>::push(std::declval<lua_State*>(), std::declval<T>()))>>
     : std::true_type
 {
 };

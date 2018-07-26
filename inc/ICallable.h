@@ -88,7 +88,14 @@ public:
             }
             else
             {
-                ArgumentStack::push(this, std::apply(m_functor, std::move(arg_tuple)));
+                if constexpr (std::is_reference<ReturnType>::value)
+                {
+                    ArgumentStack::push(this, std::ref(std::apply(m_functor, std::move(arg_tuple))));
+                }
+                else
+                {
+                    ArgumentStack::push(this, std::apply(m_functor, std::move(arg_tuple)));
+                }
             }
         }
         else
@@ -99,7 +106,14 @@ public:
             }
             else
             {
-                ArgumentStack::push(this, m_functor());
+                if constexpr (std::is_reference<ReturnType>::value)
+                {
+                    ArgumentStack::push(this, std::ref(m_functor()));
+                }
+                else
+                {
+                    ArgumentStack::push(this, m_functor());
+                }
             }
         }
     }
