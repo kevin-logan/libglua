@@ -85,3 +85,13 @@ function example_enumeration(enum_value)
 
     return 1
 end
+
+function example_custom_template_binding(custom_type)
+    print("Received custom handled object with value: " .. custom_type)
+end
+
+function  example_optionals(opt_str, opt_int)
+    print("example_optionals received: " .. tostring(opt_str) .. ", " .. tostring(opt_int))
+
+    receive_optional_str(opt_str)
+end

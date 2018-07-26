@@ -82,117 +82,8 @@ private:
     T m_value;
 };
 
-template<typename T, typename = void>
-struct ManagedTypeHandler
-{
-    static auto get(lua_State* state, size_t stack_index) -> T
-    {
-        if constexpr (std::is_enum<T>::value)
-        {
-            // lua treats as number
-            return static_cast<T>(lua_tonumber(state, stack_index));
-        }
-        else if constexpr (std::is_copy_constructible<T>::value)
-        {
-            lua_getglobal(state, "LuaClass");
-            auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-            lua_pop(state, 1);
-
-            auto metatable_name_opt = lua_object->GetMetatableName<T>();
-
-            if (metatable_name_opt.has_value())
-            {
-                IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
-                    luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
-
-                if (managed_type_ptr != nullptr)
-                {
-                    switch (managed_type_ptr->GetStorageType())
-                    {
-                        case ManagedTypeStorage::RAW_PTR:
-                        {
-                            return *static_cast<ManagedTypeRawPtr<T>*>(managed_type_ptr)->GetValue();
-                        }
-                        break;
-                        case ManagedTypeStorage::SHARED_PTR:
-                        {
-                            return *static_cast<ManagedTypeSharedPtr<T>*>(managed_type_ptr)->GetValue();
-                        }
-                        break;
-                        case ManagedTypeStorage::STACK_ALLOCATED:
-                        {
-                            return static_cast<ManagedTypeStackAllocated<T>*>(managed_type_ptr)->GetValue();
-                        }
-                        break;
-                    }
-                }
-                else
-                {
-                    throw kdk::exceptions::LuaException("Tried to get type but invalid value at index!");
-                }
-            }
-            else
-            {
-                throw kdk::exceptions::LuaException("Tried to get type with no registered metatable!");
-            }
-        }
-        else
-        {
-            throw exceptions::LuaException("Tried to get value of unmanaged type");
-        }
-    }
-
-    static auto push(lua_State* state, T value) -> void
-    {
-        if constexpr (std::is_enum<T>::value)
-        {
-            // lua treats as number
-            lua_pushnumber(state, static_cast<lua_Number>(value));
-        }
-        else if constexpr (std::is_copy_constructible<T>::value)
-        {
-            lua_getglobal(state, "LuaClass");
-            auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-            lua_pop(state, 1);
-
-            auto metatable_name_opt = lua_object->GetMetatableName<T>();
-
-            if (metatable_name_opt.has_value())
-            {
-                ManagedTypeStackAllocated<T>* managed_type_ptr = static_cast<ManagedTypeStackAllocated<T>*>(
-                    lua_newuserdata(state, sizeof(ManagedTypeStackAllocated<T>)));
-
-                managed_type_ptr = new (managed_type_ptr) ManagedTypeStackAllocated<T>{std::move(value)};
-
-                auto metatable_name = metatable_name_opt.value();
-
-                // set the metatable for this object
-                luaL_getmetatable(state, metatable_name.data());
-
-                if (lua_isnil(state, -1))
-                {
-                    lua_pop(state, 1);
-                    managed_type_ptr->~ManagedTypeStackAllocated<T>();
-
-                    throw std::runtime_error(
-                        "Pushing class type which has not been registered [null metatable]! " + metatable_name);
-                }
-                lua_setmetatable(state, -2);
-            }
-            else
-            {
-                throw std::runtime_error("Pushing class type which has not been registered [no metatable name]!");
-            }
-        }
-        else
-        {
-            throw exceptions::LuaException("Tried to push value of unmanaged type");
-        }
-    }
-}; // namespace kdk::lua
-
 template<typename T>
-struct ManagedTypeHandler<T*, void> // std::void_t<decltype(std::declval<T*>()->shared_from_this())>>
+struct ManagedTypeHandler<T*, void>
 {
     static auto get(lua_State* state, int32_t stack_index) -> T*
     {
@@ -276,8 +167,10 @@ struct ManagedTypeHandler<T*, void> // std::void_t<decltype(std::declval<T*>()->
     }
 };
 
-template<typename T>
-struct ManagedTypeHandler<T&, void> // std::void_t<decltype(std::declval<T&>().shared_from_this())>>
+/*template<typename T>
+struct ManagedTypeHandler<
+    T&,
+    std::enable_if_t<std::is_copy_constructible<T>::value && !std::is_enum<T>::value && !HasTypeHandler<T>::value>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> T&
     {
@@ -359,7 +252,104 @@ struct ManagedTypeHandler<T&, void> // std::void_t<decltype(std::declval<T&>().s
             throw std::runtime_error("Pushing class type which has not been registered [no metatable name]!");
         }
     }
+};*/
+
+template<typename T>
+struct ManagedTypeHandler<std::vector<T>>
+{
+    static auto get(lua_State* state, int32_t stack_index) -> std::vector<T>
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        if (lua_istable(state, stack_index))
+        {
+            std::vector<T> result;
+
+            size_t length = lua_objlen(state, stack_index);
+
+            result.reserve(length);
+
+            for (size_t i = 0; i < length; ++i)
+            {
+                // get our value onto the stack...
+                lua_pushinteger(state, static_cast<lua_Integer>(i + 1)); // lua arrays 1 based
+
+                if (stack_index >= 0)
+                {
+                    lua_gettable(state, stack_index);
+                }
+                else
+                {
+                    // we have a negative (from the end) index, which we've changed by pushing the index
+                    lua_gettable(state, stack_index - 1);
+                }
+
+                result.emplace_back(lua_object->Pop<T>());
+            }
+
+            return result;
+        }
+        else
+        {
+            throw exceptions::LuaException("Attempted to pop array off stack but top of stack wasn't a table");
+        }
+    }
+
+    static auto push(lua_State* state, std::vector<T> value) -> void
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        auto size = value.size();
+        lua_createtable(state, size, 0);
+        for (size_t i = 0; i < size; ++i)
+        {
+            lua_pushinteger(state, static_cast<lua_Integer>(i + 1)); // lua arrays 1 based
+            lua_object->Push(std::move(value[i]));
+
+            lua_settable(state, -3);
+        }
+    }
 };
+
+template<typename T>
+struct ManagedTypeHandler<std::optional<T>>
+{
+    static auto get(lua_State* state, int32_t stack_index) -> std::optional<T>
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        if (lua_isnil(state, stack_index))
+        {
+            return {};
+        }
+        else
+        {
+            return lua_object->Pop<T>();
+        }
+    }
+
+    static auto push(lua_State* state, std::optional<T> value) -> void
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        if (value.has_value())
+        {
+            lua_object->Push(std::move(value.value()));
+        }
+        else
+        {
+            lua_pushnil(state);
+        }
+    }
+}; // namespace kdk::glua
 
 template<typename T>
 struct ManagedTypeHandler<std::shared_ptr<T>>
@@ -522,6 +512,118 @@ struct ManagedTypeHandler<std::reference_wrapper<T>, void>
 };
 
 template<typename T>
+struct ManagedTypeHandler<T, std::enable_if_t<std::is_enum<T>::value && !HasTypeHandler<T>::value>>
+{
+    static auto get(lua_State* state, size_t stack_index) -> T
+    {
+        // lua treats as number
+        return static_cast<T>(lua_tonumber(state, stack_index));
+    }
+    static auto push(lua_State* state, T value) -> void
+    {
+        // lua treats as number
+        lua_pushnumber(state, static_cast<lua_Number>(value));
+    }
+};
+
+template<typename T>
+struct ManagedTypeHandler<T, std::enable_if_t<HasCustomGet<T>::value && HasCustomPush<T>::value>>
+{
+    static auto get(lua_State* state, size_t stack_index) -> T { return T::glua_get(state, stack_index); }
+    static auto push(lua_State* state, T value) -> void { T::glua_push(state, std::move(value)); }
+};
+
+template<typename T>
+struct ManagedTypeHandler<
+    T,
+    std::enable_if_t<
+        std::is_copy_constructible<T>::value && !std::is_enum<T>::value && !HasTypeHandler<T>::value &&
+        (!HasCustomGet<T>::value || !HasCustomPush<T>::value)>>
+{
+    static auto get(lua_State* state, size_t stack_index) -> T
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        auto metatable_name_opt = lua_object->GetMetatableName<std::remove_reference_t<T>>();
+
+        if (metatable_name_opt.has_value())
+        {
+            IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
+                luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+
+            if (managed_type_ptr != nullptr)
+            {
+                switch (managed_type_ptr->GetStorageType())
+                {
+                    case ManagedTypeStorage::RAW_PTR:
+                    {
+                        return *static_cast<ManagedTypeRawPtr<std::remove_reference_t<T>>*>(managed_type_ptr)->GetValue();
+                    }
+                    break;
+                    case ManagedTypeStorage::SHARED_PTR:
+                    {
+                        return *static_cast<ManagedTypeSharedPtr<std::remove_reference_t<T>>*>(managed_type_ptr)->GetValue();
+                    }
+                    break;
+                    case ManagedTypeStorage::STACK_ALLOCATED:
+                    {
+                        return static_cast<ManagedTypeStackAllocated<std::remove_reference_t<T>>*>(managed_type_ptr)
+                            ->GetValue();
+                    }
+                    break;
+                }
+            }
+            else
+            {
+                throw kdk::exceptions::LuaException("Tried to get type but invalid value at index!");
+            }
+        }
+        else
+        {
+            throw kdk::exceptions::LuaException("Tried to get type with no registered metatable!");
+        }
+    } // namespace kdk::glua
+    static auto push(lua_State* state, T value) -> void
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        auto metatable_name_opt = lua_object->GetMetatableName<std::remove_reference_t<T>>();
+
+        if (metatable_name_opt.has_value())
+        {
+            ManagedTypeStackAllocated<T>* managed_type_ptr =
+                static_cast<ManagedTypeStackAllocated<T>*>(lua_newuserdata(state, sizeof(ManagedTypeStackAllocated<T>)));
+
+            managed_type_ptr =
+                new (managed_type_ptr) ManagedTypeStackAllocated<std::remove_reference_t<T>>{std::move(value)};
+
+            auto metatable_name = metatable_name_opt.value();
+
+            // set the metatable for this object
+            luaL_getmetatable(state, metatable_name.data());
+
+            if (lua_isnil(state, -1))
+            {
+                lua_pop(state, 1);
+                managed_type_ptr->~ManagedTypeStackAllocated<std::remove_reference_t<T>>();
+
+                throw std::runtime_error(
+                    "Pushing class type which has not been registered [null metatable]! " + metatable_name);
+            }
+            lua_setmetatable(state, -2);
+        }
+        else
+        {
+            throw std::runtime_error("Pushing class type which has not been registered [no metatable name]!");
+        }
+    }
+};
+
+template<typename T>
 auto Glua::get(lua_State* state, int32_t stack_index) -> T
 {
     return ManagedTypeHandler<T>::get(state, stack_index);
@@ -581,51 +683,9 @@ template<>
 auto Glua::get(lua_State* lua, int32_t stack_index) -> std::string_view;
 
 template<typename T>
-auto Glua::Push(const std::vector<T>& arr) -> void
-{
-    auto size = arr.size();
-    lua_createtable(m_lua, size, 0);
-    for (size_t i = 0; i < size; ++i)
-    {
-        lua_pushinteger(m_lua, static_cast<lua_Integer>(i + 1)); // lua arrays 1 based
-        Push(arr[i]);
-
-        lua_settable(m_lua, -3);
-    }
-}
-
-template<typename T>
 auto Glua::Push(T value) -> void
 {
     return ManagedTypeHandler<T>::push(m_lua, std::move(value));
-}
-
-template<typename T>
-auto Glua::PopArray() -> std::vector<T>
-{
-    if (lua_istable(m_lua, -1))
-    {
-        std::vector<T> result;
-
-        size_t length = lua_objlen(m_lua, -1);
-
-        result.reserve(length);
-
-        for (size_t i = 0; i < length; ++i)
-        {
-            // get our value onto the stack...
-            lua_pushinteger(m_lua, static_cast<lua_Integer>(i + 1)); // lua arrays 1 based
-            lua_gettable(m_lua, -2);
-
-            result.emplace_back(Pop<T>());
-        }
-
-        return result;
-    }
-    else
-    {
-        throw exceptions::LuaException("Attempted to pop array off stack but top of stack wasn't a table");
-    }
 }
 
 template<typename T>

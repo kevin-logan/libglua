@@ -55,13 +55,7 @@ public:
     auto Push(std::string value) -> void;
 
     template<typename T>
-    auto Push(const std::vector<T>& vector) -> void;
-
-    template<typename T>
     auto Push(T value) -> void;
-
-    template<typename T>
-    auto PopArray() -> std::vector<T>;
 
     template<typename T>
     auto Pop() -> T;
@@ -134,6 +128,93 @@ auto destruct_managed_type(lua_State* state) -> int;
 
 auto remove_all_whitespace(std::string_view input) -> std::string;
 auto split(std::string_view input, std::string_view token) -> std::vector<std::string_view>;
+
+// specialize this type with your type to add custom handling
+template<typename T, typename = void>
+struct ManagedTypeHandler
+{
+    static auto get(lua_State* state, size_t stack_index) -> T
+    {
+        (void)state;
+        (void)stack_index;
+        throw exceptions::LuaException("Tried to get value of unmanaged type");
+    }
+    static auto push(lua_State* state, T value) -> void
+    {
+        (void)state;
+        (void)value;
+        throw exceptions::LuaException("Tried to push value of unmanaged type");
+    }
+};
+
+template<typename T>
+struct IsVector : std::false_type
+{
+};
+
+template<typename T>
+struct IsVector<std::vector<T>> : std::true_type
+{
+};
+
+template<typename T>
+struct IsOptional : std::false_type
+{
+};
+
+template<typename T>
+struct IsOptional<std::optional<T>> : std::true_type
+{
+};
+
+template<typename T>
+struct IsSharedPtr : std::false_type
+{
+};
+
+template<typename T>
+struct IsSharedPtr<std::shared_ptr<T>> : std::true_type
+{
+};
+
+template<typename T>
+struct IsReferenceWrapper : std::false_type
+{
+};
+
+template<typename T>
+struct IsReferenceWrapper<std::reference_wrapper<T>> : std::true_type
+{
+};
+
+template<typename T>
+struct HasTypeHandler
+{
+    static constexpr bool value =
+        IsVector<T>::value || IsOptional<T>::value || IsSharedPtr<T>::value || IsReferenceWrapper<T>::value;
+};
+
+template<typename T, typename = void>
+struct HasCustomGet : std::false_type
+{
+};
+
+template<typename T>
+struct HasCustomGet<T, std::void_t<decltype(T::glua_get(std::declval<lua_State*>(), std::declval<size_t>()))>>
+    : std::true_type
+{
+};
+
+template<typename T, typename = void>
+struct HasCustomPush : std::false_type
+{
+};
+
+template<typename T>
+struct HasCustomPush<T, std::void_t<decltype(T::glua_push(std::declval<lua_State*>(), std::declval<T>()))>>
+    : std::true_type
+{
+};
 
 } // namespace kdk::glua
 

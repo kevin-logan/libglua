@@ -7,13 +7,6 @@
 #include <string>
 #include <string_view>
 
-static auto example_binding(std::string_view some_str, double some_double) -> std::string
-{
-    std::stringstream stream;
-    stream << "example_binding called with (" << some_str << ", " << some_double << ")" << std::endl;
-    return stream.str();
-}
-
 class ExampleClass : public std::enable_shared_from_this<ExampleClass>
 {
 public:
@@ -46,18 +39,21 @@ public:
 
 private:
     int64_t m_value;
-
-    static uint64_t g_count;
 };
 
-uint64_t BoxedValue::g_count = 0ul;
-
-auto some_func(BoxedValue& derp) -> void
+static auto receive_optional_str(std::optional<std::string> o)
 {
-    std::cout << __PRETTY_FUNCTION__ << " called with " << derp.GetValue() << std::endl;
+    if (o.has_value())
+    {
+        std::cout << "received_optional_str called with " << o.value() << std::endl;
+    }
+    else
+    {
+        std::cout << "received_optional_str called with no value" << std::endl;
+    }
 }
 
-auto example_sandboxed_environment(kdk::glua::Glua::Ptr glua, const std::string& script) -> void
+static auto example_sandboxed_environment(kdk::glua::Glua::Ptr glua, const std::string& script) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
@@ -72,28 +68,35 @@ auto example_sandboxed_environment(kdk::glua::Glua::Ptr glua, const std::string&
     glua->CallScriptFunction("example_sandboxed_environment");
 }
 
-auto example_library_functions(kdk::glua::Glua::Ptr glua) -> void
+static auto example_library_functions(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
     glua->CallScriptFunction("example_library_functions");
 }
 
-auto example_managed_cpp_class(kdk::glua::Glua::Ptr glua) -> void
+static auto example_managed_cpp_class(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
     glua->CallScriptFunction("example_managed_cpp_class");
 }
 
-auto example_simple_binding(kdk::glua::Glua::Ptr glua) -> void
+static auto example_binding(std::string_view some_str, double some_double) -> std::string
+{
+    std::stringstream stream;
+    stream << "example_binding called with (" << some_str << ", " << some_double << ")" << std::endl;
+    return stream.str();
+}
+
+static auto example_simple_binding(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
     glua->CallScriptFunction("example_simple_binding");
 }
 
-auto example_global_value(kdk::glua::Glua::Ptr glua) -> void
+static auto example_global_value(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
@@ -101,14 +104,14 @@ auto example_global_value(kdk::glua::Glua::Ptr glua) -> void
     glua->CallScriptFunction("example_global_value");
 }
 
-auto example_inferred_storage_cpp_class(kdk::glua::Glua::Ptr glua) -> void
+static auto example_inferred_storage_cpp_class(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
     glua->CallScriptFunction("example_inferred_storage_cpp_class");
 }
 
-auto example_callable_from_cpp(kdk::glua::Glua::Ptr glua) -> void
+static auto example_callable_from_cpp(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
@@ -121,14 +124,14 @@ auto example_callable_from_cpp(kdk::glua::Glua::Ptr glua) -> void
     std::cout << "example_callable_from_cpp returned: " << first_return << ", " << second_return << std::endl;
 }
 
-auto example_reverse_array(kdk::glua::Glua::Ptr glua) -> void
+static auto example_reverse_array(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
     std::vector<BoxedValue> v{BoxedValue{1}, BoxedValue{2}, BoxedValue{3}, BoxedValue{4}, BoxedValue{5}};
     glua->CallScriptFunction("example_reverse_array", v);
 
-    auto reversed_array = glua->PopArray<BoxedValue>();
+    auto reversed_array = glua->Pop<std::vector<BoxedValue>>();
 
     std::cout << "reverse_array returned:";
     for (auto& val : reversed_array)
@@ -138,7 +141,7 @@ auto example_reverse_array(kdk::glua::Glua::Ptr glua) -> void
     std::cout << std::endl;
 }
 
-auto example_mutate_value(kdk::glua::Glua::Ptr glua) -> void
+static auto example_mutate_value(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
@@ -151,7 +154,7 @@ auto example_mutate_value(kdk::glua::Glua::Ptr glua) -> void
     std::cout << "mutate_boxed_value called with reference, value: " << our_value.GetValue() << std::endl;
 }
 
-auto example_create_and_retrieve_global(kdk::glua::Glua::Ptr glua) -> void
+static auto example_create_and_retrieve_global(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
@@ -167,7 +170,7 @@ enum class ExampleEnum
     RED   = 3,
     BLACK = 4
 };
-auto example_enumeration(kdk::glua::Glua::Ptr glua) -> void
+static auto example_enumeration(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
@@ -191,13 +194,62 @@ auto example_enumeration(kdk::glua::Glua::Ptr glua) -> void
     }
 }
 
+template<typename ClassType, typename ValueType>
+class TemplateExample
+{
+public:
+    TemplateExample(ValueType v) : m_value(std::move(v)) {}
+
+    auto GetValue() const -> const ValueType& { return m_value; }
+
+    static auto glua_get(lua_State* state, size_t stack_index) -> TemplateExample<ClassType, ValueType>
+    {
+        // get as value type
+        return TemplateExample<ClassType, ValueType>{kdk::glua::Glua::get<ValueType>(state, stack_index)};
+    }
+    static auto glua_push(lua_State* state, TemplateExample<ClassType, ValueType> value) -> void
+    {
+        // get as value type
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<kdk::glua::Glua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        lua_object->Push(value.GetValue());
+    }
+
+private:
+    ValueType m_value;
+};
+static auto example_custom_template_binding(kdk::glua::Glua::Ptr glua) -> void
+{
+    std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
+
+    glua->CallScriptFunction("example_custom_template_binding", TemplateExample<BoxedValue, std::string>{"herp"});
+    glua->CallScriptFunction("example_custom_template_binding", TemplateExample<ExampleClass, int64_t>{1337});
+}
+
+static auto example_optionals(kdk::glua::Glua::Ptr glua) -> void
+{
+    std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
+
+    REGISTER_TO_LUA(glua, receive_optional_str);
+
+    std::optional<std::string> opt_str;
+    std::optional<int64_t>     opt_int;
+
+    glua->CallScriptFunction("example_optionals", opt_str, opt_int);
+
+    opt_str = "herp";
+    opt_int = 1337;
+    glua->CallScriptFunction("example_optionals", opt_str, opt_int);
+}
+
 auto main(int argc, char* argv[]) -> int
 {
     auto glua = kdk::glua::Glua::Create(std::cout);
 
     ///////////// ADD CUSTOM BINDINDS HERE /////////////
     REGISTER_TO_LUA(glua, example_binding);
-    REGISTER_TO_LUA(glua, some_func);
     REGISTER_CLASS_TO_LUA(glua, ExampleClass, &ExampleClass::GetValue, &ExampleClass::SetValue, &ExampleClass::Increment);
     REGISTER_CLASS_TO_LUA(glua, BoxedValue, &BoxedValue::GetValue, &BoxedValue::SetValue);
 
@@ -227,6 +279,8 @@ auto main(int argc, char* argv[]) -> int
         example_mutate_value(glua);
         example_create_and_retrieve_global(glua);
         example_enumeration(glua);
+        example_custom_template_binding(glua);
+        example_optionals(glua);
     }
 
     return 0;
