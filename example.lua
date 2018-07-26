@@ -38,6 +38,8 @@ function example_managed_cpp_class()
     bound_class_1:Increment(bound_class_2)
 
     print("post increment value = " .. bound_class_1:GetValue())
+
+    print("bound_class_1:ExampleOverload():GetValue() = " .. bound_class_1:ExampleOverload():GetValue())
 end
 
 function example_simple_binding()

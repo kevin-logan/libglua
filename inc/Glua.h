@@ -95,6 +95,9 @@ public:
     auto RegisterClass(std::vector<std::string_view> method_names, std::vector<std::unique_ptr<ICallable>> methods)
         -> void;
 
+    template<typename ClassType>
+    auto RegisterMethod(const std::string& method_name, Callable method) -> void;
+
     auto GetLuaState() -> lua_State*;
     auto GetLuaState() const -> const lua_State*;
 

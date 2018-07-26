@@ -912,6 +912,38 @@ auto Glua::RegisterClass(std::vector<std::string_view> method_names, std::vector
     }
 }
 
+template<typename ClassType>
+auto Glua::RegisterMethod(const std::string& method_name, Callable method) -> void
+{
+    auto metatable_opt = GetMetatableName<ClassType>();
+
+    if (metatable_opt.has_value())
+    {
+        luaL_getmetatable(m_lua, metatable_opt.value().data());
+
+        auto pos_pair =
+            m_method_registry[metatable_opt.value()].emplace(method_name, std::move(method).AcquireCallable());
+
+        if (pos_pair.second)
+        {
+            lua_pushlstring(m_lua, method_name.data(), method_name.size());
+            auto* callable_ptr = pos_pair.first->second.get();
+            lua_pushlightuserdata(m_lua, callable_ptr);
+            lua_pushcclosure(m_lua, call_callable_from_lua, 1);
+        }
+        else
+        {
+            throw exceptions::LuaException("Tried to register method with already registered name [" + method_name + "]");
+        }
+
+        lua_settable(m_lua, -3);
+    }
+    else
+    {
+        throw exceptions::LuaException("Tried to register method to unregistered class [no metatable]");
+    }
+}
+
 template<typename T>
 auto Glua::GetMetatableName() -> std::optional<std::string>
 {

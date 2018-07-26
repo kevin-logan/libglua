@@ -18,6 +18,9 @@ public:
     auto SetValue(int64_t value) -> void { m_value = value; }
     auto GetValue() const -> int64_t { return m_value; }
 
+    auto ExampleOverload() -> ExampleClass& { return *this; }
+    auto ExampleOverload() const -> const ExampleClass& { return *this; }
+
     auto Increment(std::shared_ptr<ExampleClass> other) { m_value += other->GetValue(); }
 
 private:
@@ -78,6 +81,11 @@ static auto example_library_functions(kdk::glua::Glua::Ptr glua) -> void
 static auto example_managed_cpp_class(kdk::glua::Glua::Ptr glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
+
+    // to bind overloaded method we must manually bind the overload we desire
+    glua->RegisterMethod<ExampleClass>(
+        "ExampleOverload",
+        glua->CreateLuaCallable(static_cast<ExampleClass& (ExampleClass::*)()>(&ExampleClass::ExampleOverload)));
 
     glua->CallScriptFunction("example_managed_cpp_class");
 }
