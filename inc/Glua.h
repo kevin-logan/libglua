@@ -28,7 +28,7 @@ class Glua : public std::enable_shared_from_this<Glua>
 {
 public:
     using Ptr = std::shared_ptr<Glua>;
-    static auto Create(std::ostream& output_stream) -> Ptr;
+    static auto Create(std::ostream& output_stream, bool start_sandboxed = true) -> Ptr;
 
     template<typename T>
     static auto get(const ICallable* callable, int32_t stack_index) -> T;
@@ -107,12 +107,12 @@ public:
     template<typename T>
     auto SetMetatableName(std::string metatable_name) -> void;
 
-    auto ResetEnvironment() -> void;
+    auto ResetEnvironment(bool sandboxed = true) -> void;
 
     ~Glua();
 
 private:
-    Glua(std::ostream& output_stream);
+    Glua(std::ostream& output_stream, bool start_sandboxed);
 
     auto get_global_onto_stack(const std::string& global_name) -> void;
     auto set_global_from_stack(const std::string& global_name) -> void;
@@ -137,7 +137,7 @@ template<typename T, typename = void>
 struct CustomTypeHandler
 {
     // implement these static functions in your specialization to allow your custom type
-    /*static auto get(lua_State* state, size_t stack_index) -> T
+    /*static auto get(lua_State* state, int32_t stack_index) -> T
     {
         (void)state;
         (void)stack_index;
@@ -149,6 +149,41 @@ struct CustomTypeHandler
         (void)value;
         throw exceptions::LuaException("Tried to push value of unmanaged type");
     }*/
+};
+
+/*
+auto Push(bool value) -> void;
+auto Push(int8_t value) -> void;
+auto Push(int16_t value) -> void;
+auto Push(int32_t value) -> void;
+auto Push(int64_t value) -> void;
+auto Push(uint8_t value) -> void;
+auto Push(uint16_t value) -> void;
+auto Push(uint32_t value) -> void;
+auto Push(uint64_t value) -> void;
+auto Push(float value) -> void;
+auto Push(double value) -> void;
+auto Push(const char* value) -> void;
+auto Push(std::string_view value) -> void;
+auto Push(std::string value) -> void;
+*/
+template<typename T>
+struct IsBasicType : std::disjunction<
+                         std::is_same<std::remove_const_t<T>, bool>,
+                         std::is_same<std::remove_const_t<T>, int8_t>,
+                         std::is_same<std::remove_const_t<T>, int16_t>,
+                         std::is_same<std::remove_const_t<T>, int32_t>,
+                         std::is_same<std::remove_const_t<T>, int64_t>,
+                         std::is_same<std::remove_const_t<T>, uint8_t>,
+                         std::is_same<std::remove_const_t<T>, uint16_t>,
+                         std::is_same<std::remove_const_t<T>, uint32_t>,
+                         std::is_same<std::remove_const_t<T>, uint64_t>,
+                         std::is_same<std::remove_const_t<T>, float>,
+                         std::is_same<std::remove_const_t<T>, double>,
+                         std::is_same<std::remove_const_t<T>, char*>,
+                         std::is_same<std::remove_const_t<T>, std::string_view>,
+                         std::is_same<std::remove_const_t<T>, std::string>>
+{
 };
 
 template<typename T>
@@ -194,8 +229,9 @@ struct IsReferenceWrapper<std::reference_wrapper<T>> : std::true_type
 template<typename T>
 struct HasTypeHandler
 {
-    static constexpr bool value =
-        IsVector<T>::value || IsOptional<T>::value || IsSharedPtr<T>::value || IsReferenceWrapper<T>::value;
+    static constexpr bool value = IsVector<std::remove_const_t<T>>::value || IsOptional<std::remove_const_t<T>>::value ||
+                                  IsSharedPtr<std::remove_const_t<T>>::value ||
+                                  IsReferenceWrapper<std::remove_const_t<T>>::value;
 };
 
 template<typename T, typename = void>
@@ -204,7 +240,9 @@ struct HasCustomGet : std::false_type
 };
 
 template<typename T>
-struct HasCustomGet<T, std::void_t<decltype(CustomTypeHandler<T>::get(std::declval<lua_State*>(), std::declval<size_t>()))>>
+struct HasCustomGet<
+    T,
+    std::void_t<decltype(CustomTypeHandler<std::remove_const_t<T>>::get(std::declval<lua_State*>(), std::declval<int32_t>()))>>
     : std::true_type
 {
 };
@@ -215,13 +253,21 @@ struct HasCustomPush : std::false_type
 };
 
 template<typename T>
-struct HasCustomPush<T, std::void_t<decltype(CustomTypeHandler<T>::push(std::declval<lua_State*>(), std::declval<T>()))>>
+struct HasCustomPush<
+    T,
+    std::void_t<decltype(
+        CustomTypeHandler<std::remove_const_t<T>>::push(std::declval<lua_State*>(), std::declval<std::remove_const_t<T>>()))>>
     : std::true_type
 {
 };
 
 template<typename T>
-struct HasCustomHandler
+struct HasCustomHandler : std::conjunction<HasCustomGet<T>, HasCustomPush<T>>
+{
+};
+
+template<typename T>
+struct IsManualType : std::disjunction<HasCustomHandler<T>, HasTypeHandler<T>>
 {
     static constexpr bool value = HasCustomGet<T>::value && HasCustomPush<T>::value;
 };

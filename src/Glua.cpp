@@ -4,9 +4,9 @@
 
 namespace kdk::glua
 {
-auto Glua::Create(std::ostream& output_stream) -> Ptr
+auto Glua::Create(std::ostream& output_stream, bool start_sandboxed) -> Ptr
 {
-    return Ptr{new Glua(output_stream)};
+    return Ptr{new Glua(output_stream, start_sandboxed)};
 }
 
 auto Glua::Push(bool value) -> void
@@ -206,7 +206,7 @@ auto Glua::RunScript(std::string_view script_data) -> void
     }
     else
     {
-        throw exceptions::LuaException("Failed to load script");
+        throw exceptions::LuaException(std::string{"Failed to load script"}.append(lua_tostring(m_lua, -1)));
     }
 }
 
@@ -269,14 +269,21 @@ auto Glua::GetLuaState() const -> const lua_State*
     return m_lua;
 }
 
-auto Glua::ResetEnvironment() -> void
+auto Glua::ResetEnvironment(bool sandboxed) -> void
 {
-    lua_getglobal(m_lua, "__libglua__sandbox__");
+    if (sandboxed)
+    {
+        lua_getglobal(m_lua, "__libglua__sandbox__");
+    }
+    else
+    {
+        lua_getglobal(m_lua, "_G");
+    }
 
     lua_newtable(m_lua);               // env
     lua_pushvalue(m_lua, -1);          // env -> env
     lua_pushliteral(m_lua, "__index"); // env -> env -> __index
-    lua_pushvalue(m_lua, -4);          // push __libglua__sandbox__, env -> env -> __index -> sandbox
+    lua_pushvalue(m_lua, -4);          // push (__libglua__sandbox__ or _G), env -> env -> __index -> sandbox
     lua_settable(m_lua, -3);           // env -> env
     lua_setmetatable(m_lua, -2);       // env
 
@@ -348,7 +355,7 @@ glua_set_sub_environment_to_stack(lua_State* lua, std::string_view parent_table,
     lua_settable(lua, -3);
 }
 
-Glua::Glua(std::ostream& output_stream) : m_lua(luaL_newstate()), m_output_stream(output_stream)
+Glua::Glua(std::ostream& output_stream, bool start_sandboxed) : m_lua(luaL_newstate()), m_output_stream(output_stream)
 {
     luaL_openlibs(m_lua);
 
@@ -370,7 +377,9 @@ Glua::Glua(std::ostream& output_stream) : m_lua(luaL_newstate()), m_output_strea
                                                  "type",
                                                  "unpack",
                                                  "_VERSION",
-                                                 "xpcall"};
+                                                 "xpcall",
+                                                 "getmetatable",
+                                                 "isfunction"};
     std::vector<std::string> sandbox_coroutine_environment{"create", "resume", "running", "status", "wrap", "yield"};
     std::vector<std::string> sandbox_io_environment{"read", "write", "flush", "type"};
     std::vector<std::string> sandbox_string_environment{
@@ -396,7 +405,7 @@ Glua::Glua(std::ostream& output_stream) : m_lua(luaL_newstate()), m_output_strea
     lua_setglobal(m_lua, "__libglua__sandbox__");
 
     // now that sandbox is set up, reset environment
-    ResetEnvironment();
+    ResetEnvironment(start_sandboxed);
 
     lua_pushlightuserdata(m_lua, this);
     lua_setglobal(m_lua, "LuaClass");
