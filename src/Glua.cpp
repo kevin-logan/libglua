@@ -378,7 +378,6 @@ Glua::Glua(std::ostream& output_stream, bool start_sandboxed) : m_lua(luaL_newst
                                                  "unpack",
                                                  "_VERSION",
                                                  "xpcall",
-                                                 "getmetatable",
                                                  "isfunction"};
     std::vector<std::string> sandbox_coroutine_environment{"create", "resume", "running", "status", "wrap", "yield"};
     std::vector<std::string> sandbox_io_environment{"read", "write", "flush", "type"};
