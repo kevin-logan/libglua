@@ -90,7 +90,7 @@ struct ManagedTypeHandler
 };
 
 template<typename T>
-struct ManagedTypeHandler<T*, std::enable_if_t<!HasCustomHandler<T>::value>>
+struct ManagedTypeHandler<T*, std::enable_if_t<!IsManualType<T>::value>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> T*
     {
@@ -102,8 +102,8 @@ struct ManagedTypeHandler<T*, std::enable_if_t<!HasCustomHandler<T>::value>>
 
         if (metatable_name_opt.has_value())
         {
-            IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
-                luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+            IManagedTypeStorage* managed_type_ptr =
+                static_cast<IManagedTypeStorage*>(luaL_checkudata(state, stack_index, metatable_name_opt.value().data()));
 
             if (managed_type_ptr != nullptr)
             {
@@ -359,7 +359,7 @@ struct ManagedTypeHandler<std::optional<T>>
 }; // namespace kdk::glua
 
 template<typename T>
-struct ManagedTypeHandler<std::shared_ptr<T>, std::enable_if_t<!HasCustomHandler<T>::value>>
+struct ManagedTypeHandler<std::shared_ptr<T>, std::enable_if_t<!IsManualType<T>::value>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> std::shared_ptr<T>
     {
@@ -371,8 +371,8 @@ struct ManagedTypeHandler<std::shared_ptr<T>, std::enable_if_t<!HasCustomHandler
 
         if (metatable_name_opt.has_value())
         {
-            IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
-                luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+            IManagedTypeStorage* managed_type_ptr =
+                static_cast<IManagedTypeStorage*>(luaL_checkudata(state, stack_index, metatable_name_opt.value().data()));
 
             if (managed_type_ptr != nullptr)
             {
@@ -434,7 +434,22 @@ struct ManagedTypeHandler<std::shared_ptr<T>, std::enable_if_t<!HasCustomHandler
 };
 
 template<typename T>
-struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<!HasCustomHandler<T>::value>>
+struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<!IsManualType<T>::value && IsBasicType<T>::value>>
+{
+    static auto get(lua_State* state, int32_t stack_index) -> T { return Glua::get<T>(state, stack_index); }
+
+    static auto push(lua_State* state, std::reference_wrapper<T> value) -> void
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        lua_object->Push(value.get());
+    }
+};
+
+template<typename T>
+struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<!IsManualType<T>::value && !IsBasicType<T>::value>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> std::reference_wrapper<T>
     {
@@ -446,8 +461,8 @@ struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<!HasCustom
 
         if (metatable_name_opt.has_value())
         {
-            IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
-                luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+            IManagedTypeStorage* managed_type_ptr =
+                static_cast<IManagedTypeStorage*>(luaL_checkudata(state, stack_index, metatable_name_opt.value().data()));
 
             if (managed_type_ptr != nullptr)
             {
@@ -519,9 +534,24 @@ struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<!HasCustom
 };
 
 template<typename T>
+struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<IsManualType<T>::value>>
+{
+    static auto get(lua_State* state, int32_t stack_index) -> T { return Glua::get<T>(state, stack_index); }
+
+    static auto push(lua_State* state, std::reference_wrapper<T> value) -> void
+    {
+        lua_getglobal(state, "LuaClass");
+        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
+        lua_pop(state, 1);
+
+        lua_object->Push(value.get());
+    }
+};
+
+template<typename T>
 struct ManagedTypeHandler<T, std::enable_if_t<std::is_enum<T>::value && !HasTypeHandler<T>::value>>
 {
-    static auto get(lua_State* state, size_t stack_index) -> T
+    static auto get(lua_State* state, int32_t stack_index) -> T
     {
         // lua treats as number
         return static_cast<T>(lua_tonumber(state, stack_index));
@@ -536,17 +566,23 @@ struct ManagedTypeHandler<T, std::enable_if_t<std::is_enum<T>::value && !HasType
 template<typename T>
 struct ManagedTypeHandler<T, std::enable_if_t<HasCustomHandler<T>::value>>
 {
-    static auto get(lua_State* state, size_t stack_index) -> T { return CustomTypeHandler<T>::get(state, stack_index); }
-    static auto push(lua_State* state, T value) -> void { CustomTypeHandler<T>::push(state, std::move(value)); }
+    static auto get(lua_State* state, int32_t stack_index) -> T
+    {
+        return CustomTypeHandler<std::remove_const_t<T>>::get(state, stack_index);
+    }
+    static auto push(lua_State* state, T value) -> void
+    {
+        CustomTypeHandler<std::remove_const_t<T>>::push(state, std::move(value));
+    }
 };
 
 template<typename T>
 struct ManagedTypeHandler<
     T,
     std::enable_if_t<
-        std::is_copy_constructible<T>::value && !std::is_enum<T>::value && !HasTypeHandler<T>::value && !HasCustomHandler<T>::value>>
+        std::is_copy_constructible<T>::value && !std::is_enum<T>::value && !HasTypeHandler<T>::value && !IsManualType<T>::value>>
 {
-    static auto get(lua_State* state, size_t stack_index) -> T
+    static auto get(lua_State* state, int32_t stack_index) -> T
     {
         lua_getglobal(state, "LuaClass");
         auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
@@ -556,8 +592,8 @@ struct ManagedTypeHandler<
 
         if (metatable_name_opt.has_value())
         {
-            IManagedTypeStorage* managed_type_ptr = static_cast<IManagedTypeStorage*>(
-                luaL_checkudata(state, static_cast<int>(stack_index), metatable_name_opt.value().data()));
+            IManagedTypeStorage* managed_type_ptr =
+                static_cast<IManagedTypeStorage*>(luaL_checkudata(state, stack_index, metatable_name_opt.value().data()));
 
             if (managed_type_ptr != nullptr)
             {
