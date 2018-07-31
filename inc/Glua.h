@@ -269,7 +269,6 @@ struct HasCustomHandler : std::conjunction<HasCustomGet<T>, HasCustomPush<T>>
 template<typename T>
 struct IsManualType : std::disjunction<HasCustomHandler<T>, HasTypeHandler<T>>
 {
-    static constexpr bool value = HasCustomGet<T>::value && HasCustomPush<T>::value;
 };
 
 } // namespace kdk::glua
