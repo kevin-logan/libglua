@@ -9,6 +9,15 @@ auto Glua::Create(std::ostream& output_stream, bool start_sandboxed) -> Ptr
     return Ptr{new Glua(output_stream, start_sandboxed)};
 }
 
+auto Glua::GetInstanceFromState(lua_State* lua) -> Glua&
+{
+    lua_getglobal(lua, "LuaClass");
+    auto* lua_object = static_cast<kdk::glua::Glua*>(lua_touserdata(lua, -1));
+    lua_pop(lua, 1);
+
+    return *lua_object;
+}
+
 auto Glua::Push(bool value) -> void
 {
     lua_pushboolean(m_lua, value ? 1 : 0);

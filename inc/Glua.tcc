@@ -94,11 +94,7 @@ struct ManagedTypeHandler<T*, std::enable_if_t<!IsManualType<T>::value>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> T*
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<T>();
 
         if (metatable_name_opt.has_value())
         {
@@ -139,11 +135,7 @@ struct ManagedTypeHandler<T*, std::enable_if_t<!IsManualType<T>::value>>
 
     static auto push(lua_State* state, T* value) -> void
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<T>();
 
         if (metatable_name_opt.has_value())
         {
@@ -181,11 +173,7 @@ struct ManagedTypeHandler<
 {
     static auto get(lua_State* state, int32_t stack_index) -> T&
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<T>();
 
         if (metatable_name_opt.has_value())
         {
@@ -226,11 +214,7 @@ struct ManagedTypeHandler<
 
     static auto push(lua_State* state, T& value) -> void
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<T>();
 
         if (metatable_name_opt.has_value())
         {
@@ -266,9 +250,7 @@ struct ManagedTypeHandler<std::vector<T>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> std::vector<T>
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
+        auto& lua_object = Glua::GetInstanceFromState(state);
 
         if (lua_istable(state, stack_index))
         {
@@ -293,7 +275,7 @@ struct ManagedTypeHandler<std::vector<T>>
                     lua_gettable(state, stack_index - 1);
                 }
 
-                result.emplace_back(lua_object->Pop<T>());
+                result.emplace_back(lua_object.Pop<T>());
             }
 
             return result;
@@ -306,16 +288,14 @@ struct ManagedTypeHandler<std::vector<T>>
 
     static auto push(lua_State* state, std::vector<T> value) -> void
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
+        auto& lua_object = Glua::GetInstanceFromState(state);
 
         auto size = value.size();
         lua_createtable(state, size, 0);
         for (size_t i = 0; i < size; ++i)
         {
             lua_pushinteger(state, static_cast<lua_Integer>(i + 1)); // lua arrays 1 based
-            lua_object->Push(std::move(value[i]));
+            lua_object.Push(std::move(value[i]));
 
             lua_settable(state, -3);
         }
@@ -327,9 +307,7 @@ struct ManagedTypeHandler<std::optional<T>>
 {
     static auto get(lua_State* state, int32_t stack_index) -> std::optional<T>
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
+        auto& lua_object = Glua::GetInstanceFromState(state);
 
         if (lua_isnil(state, stack_index))
         {
@@ -337,19 +315,17 @@ struct ManagedTypeHandler<std::optional<T>>
         }
         else
         {
-            return lua_object->Pop<T>();
+            return lua_object.Pop<T>();
         }
     }
 
     static auto push(lua_State* state, std::optional<T> value) -> void
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
+        auto& lua_object = Glua::GetInstanceFromState(state);
 
         if (value.has_value())
         {
-            lua_object->Push(std::move(value.value()));
+            lua_object.Push(std::move(value.value()));
         }
         else
         {
@@ -363,11 +339,7 @@ struct ManagedTypeHandler<std::shared_ptr<T>, std::enable_if_t<!IsManualType<T>:
 {
     static auto get(lua_State* state, int32_t stack_index) -> std::shared_ptr<T>
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<T>();
 
         if (metatable_name_opt.has_value())
         {
@@ -398,11 +370,7 @@ struct ManagedTypeHandler<std::shared_ptr<T>, std::enable_if_t<!IsManualType<T>:
 
     static auto push(lua_State* state, std::shared_ptr<T> value) -> void
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<T>();
 
         if (metatable_name_opt.has_value())
         {
@@ -440,11 +408,7 @@ struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<!IsManualT
 
     static auto push(lua_State* state, std::reference_wrapper<T> value) -> void
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        lua_object->Push(value.get());
+        Glua::GetInstanceFromState(state).Push(value.get());
     }
 };
 
@@ -453,11 +417,7 @@ struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<!IsManualT
 {
     static auto get(lua_State* state, int32_t stack_index) -> std::reference_wrapper<T>
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<T>();
 
         if (metatable_name_opt.has_value())
         {
@@ -498,11 +458,7 @@ struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<!IsManualT
 
     static auto push(lua_State* state, std::reference_wrapper<T> value) -> void
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<T>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<T>();
 
         if (metatable_name_opt.has_value())
         {
@@ -540,11 +496,7 @@ struct ManagedTypeHandler<std::reference_wrapper<T>, std::enable_if_t<IsManualTy
 
     static auto push(lua_State* state, std::reference_wrapper<T> value) -> void
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        lua_object->Push(value.get());
+        Glua::GetInstanceFromState(state).Push(value.get());
     }
 };
 
@@ -584,11 +536,7 @@ struct ManagedTypeHandler<
 {
     static auto get(lua_State* state, int32_t stack_index) -> T
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<std::remove_reference_t<T>>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<std::remove_reference_t<T>>();
 
         if (metatable_name_opt.has_value())
         {
@@ -629,11 +577,7 @@ struct ManagedTypeHandler<
     } // namespace kdk::glua
     static auto push(lua_State* state, T value) -> void
     {
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        auto metatable_name_opt = lua_object->GetMetatableName<std::remove_reference_t<T>>();
+        auto metatable_name_opt = Glua::GetInstanceFromState(state).GetMetatableName<std::remove_reference_t<T>>();
 
         if (metatable_name_opt.has_value())
         {

@@ -30,6 +30,8 @@ public:
     using Ptr = std::shared_ptr<Glua>;
     static auto Create(std::ostream& output_stream, bool start_sandboxed = true) -> Ptr;
 
+    static auto GetInstanceFromState(lua_State* lua) -> Glua&;
+
     template<typename T>
     static auto get(const ICallable* callable, int32_t stack_index) -> T;
 

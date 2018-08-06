@@ -227,11 +227,7 @@ struct CustomTypeHandler<TemplateExample<ClassType, ValueType>>
     static auto push(lua_State* state, TemplateExample<ClassType, ValueType> value) -> void
     {
         // get as value type
-        lua_getglobal(state, "LuaClass");
-        auto* lua_object = static_cast<kdk::glua::Glua*>(lua_touserdata(state, -1));
-        lua_pop(state, 1);
-
-        lua_object->Push(value.GetValue());
+        Glua::GetInstanceFromState(state).Push(value.GetValue());
     }
 };
 } // namespace kdk::glua
