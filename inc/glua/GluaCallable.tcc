@@ -1,4 +1,4 @@
-#include "GluaCallable.h"
+#include "glua/GluaCallable.h"
 
 namespace kdk::glua
 {

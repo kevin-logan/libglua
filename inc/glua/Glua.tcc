@@ -1,4 +1,4 @@
-#include "Glua.h"
+#include "glua/Glua.h"
 
 namespace kdk::glua
 {

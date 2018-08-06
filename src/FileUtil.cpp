@@ -1,4 +1,4 @@
-#include "FileUtil.h"
+#include "glua/FileUtil.h"
 
 #include <fstream>
 #include <streambuf>

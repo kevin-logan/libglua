@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ICallable.h"
+#include "glua/ICallable.h"
 
 #include <memory>
 
@@ -26,4 +26,4 @@ private:
 
 } // namespace kdk::glua
 
-#include "GluaCallable.tcc"
+#include "glua/GluaCallable.tcc"

@@ -1,4 +1,4 @@
-#include "ICallable.h"
+#include "glua/ICallable.h"
 
 namespace kdk
 {

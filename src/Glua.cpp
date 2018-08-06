@@ -1,6 +1,6 @@
-#include "Glua.h"
+#include "glua/Glua.h"
 
-#include "FileUtil.h"
+#include "glua/FileUtil.h"
 
 namespace kdk::glua
 {

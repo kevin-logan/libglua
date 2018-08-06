@@ -275,4 +275,4 @@ struct IsManualType : std::disjunction<HasCustomHandler<T>, HasTypeHandler<T>>
 
 } // namespace kdk::glua
 
-#include "Glua.tcc"
+#include "glua/Glua.tcc"

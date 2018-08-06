@@ -1,5 +1,5 @@
-#include "FileUtil.h"
-#include "Glua.h"
+#include <glua/FileUtil.h>
+#include <glua/Glua.h>
 
 #include <iostream>
 #include <memory>

@@ -18,11 +18,11 @@ endif()
 option(D_GLIBCXX_DEBUG "Use D_GLIBCXX_DEBUG when building Debug" ON)
 
 set(SOURCE_FILES
-    inc/Exceptions.h
-    inc/FileUtil.h src/FileUtil.cpp
-    inc/ICallable.h src/ICallable.cpp
-    inc/Glua.h inc/Glua.tcc src/Glua.cpp
-    inc/GluaCallable.h inc/GluaCallable.tcc
+    inc/glua/Exceptions.h
+    inc/glua/FileUtil.h src/FileUtil.cpp
+    inc/glua/ICallable.h src/ICallable.cpp
+    inc/glua/Glua.h inc/glua/Glua.tcc src/Glua.cpp
+    inc/glua/GluaCallable.h inc/glua/GluaCallable.tcc
 )
 
 include_directories("${PROJECT_SOURCE_DIR}/inc")
