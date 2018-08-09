@@ -6,22 +6,26 @@
 
 namespace kdk::glua
 {
-class Glua;
+class GluaBase;
 
 template<typename Functor, typename... Params>
-class GluaCallable : public DeferredArgumentCallable<Glua, Functor, Params...>
+class GluaCallable : public DeferredArgumentCallable<GluaBase, Functor, Params...>
 {
 public:
-    GluaCallable(std::shared_ptr<Glua> glua, Functor functor);
-    GluaCallable(GluaCallable&&) = default;
+    GluaCallable(GluaBase* glua, Functor functor);
+    GluaCallable(const GluaCallable&)     = default;
+    GluaCallable(GluaCallable&&) noexcept = default;
 
-    auto GetGlua() const -> std::shared_ptr<Glua>;
+    auto operator=(const GluaCallable&) -> GluaCallable& = default;
+    auto operator=(GluaCallable&&) noexcept -> GluaCallable& = default;
+
+    auto GetGlua() const -> GluaBase*;
     auto GetImplementationData() const -> void* override;
 
     ~GluaCallable() override = default;
 
 private:
-    std::shared_ptr<Glua> m_glua;
+    GluaBase* m_glua;
 };
 
 } // namespace kdk::glua

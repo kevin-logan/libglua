@@ -1,5 +1,5 @@
 #include <glua/FileUtil.h>
-#include <glua/Glua.h>
+#include <glua/GluaLua.h>
 
 #include <iostream>
 #include <memory>
@@ -56,38 +56,38 @@ static auto receive_optional_str(std::optional<std::string> o)
     }
 }
 
-static auto example_sandboxed_environment(kdk::glua::Glua::Ptr glua, const std::string& script) -> void
+static auto example_sandboxed_environment(kdk::glua::GluaLua& glua, const std::string& script) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua->CallScriptFunction("example_sandboxed_environment");
-    glua->CallScriptFunction("example_sandboxed_environment");
+    glua.CallScriptFunction("example_sandboxed_environment");
+    glua.CallScriptFunction("example_sandboxed_environment");
 
     std::cout << __FUNCTION__ << " reset glua environment" << std::endl;
-    glua->ResetEnvironment();
+    glua.ResetEnvironment();
 
-    glua->RunScript(script);
-    glua->CallScriptFunction("example_sandboxed_environment");
-    glua->CallScriptFunction("example_sandboxed_environment");
+    glua.RunScript(script);
+    glua.CallScriptFunction("example_sandboxed_environment");
+    glua.CallScriptFunction("example_sandboxed_environment");
 }
 
-static auto example_library_functions(kdk::glua::Glua::Ptr glua) -> void
+static auto example_library_functions(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua->CallScriptFunction("example_library_functions");
+    glua.CallScriptFunction("example_library_functions");
 }
 
-static auto example_managed_cpp_class(kdk::glua::Glua::Ptr glua) -> void
+static auto example_managed_cpp_class(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
     // to bind overloaded method we must manually bind the overload we desire
-    glua->RegisterMethod<ExampleClass>(
+    glua.RegisterMethod<ExampleClass>(
         "ExampleOverload",
-        glua->CreateLuaCallable(static_cast<ExampleClass& (ExampleClass::*)()>(&ExampleClass::ExampleOverload)));
+        glua.CreateGluaCallable(static_cast<ExampleClass& (ExampleClass::*)()>(&ExampleClass::ExampleOverload)));
 
-    glua->CallScriptFunction("example_managed_cpp_class");
+    glua.CallScriptFunction("example_managed_cpp_class");
 }
 
 static auto example_binding(std::string_view some_str, double some_double) -> std::string
@@ -97,49 +97,49 @@ static auto example_binding(std::string_view some_str, double some_double) -> st
     return stream.str();
 }
 
-static auto example_simple_binding(kdk::glua::Glua::Ptr glua) -> void
+static auto example_simple_binding(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua->CallScriptFunction("example_simple_binding");
+    glua.CallScriptFunction("example_simple_binding");
 }
 
-static auto example_global_value(kdk::glua::Glua::Ptr glua) -> void
+static auto example_global_value(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua->SetGlobal("global_boxed_value", BoxedValue{1337});
-    glua->CallScriptFunction("example_global_value");
+    glua.SetGlobal("global_boxed_value", BoxedValue{1337});
+    glua.CallScriptFunction("example_global_value");
 }
 
-static auto example_inferred_storage_cpp_class(kdk::glua::Glua::Ptr glua) -> void
+static auto example_inferred_storage_cpp_class(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua->CallScriptFunction("example_inferred_storage_cpp_class");
+    glua.CallScriptFunction("example_inferred_storage_cpp_class");
 }
 
-static auto example_callable_from_cpp(kdk::glua::Glua::Ptr glua) -> void
+static auto example_callable_from_cpp(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua->CallScriptFunction("example_callable_from_cpp", 1337, "herpaderp");
+    glua.CallScriptFunction("example_callable_from_cpp", 1337, "herpaderp");
 
     // expect two return values
-    auto second_return = glua->Pop<int64_t>();
-    auto first_return  = glua->Pop<std::string>();
+    auto second_return = glua.Pop<int64_t>();
+    auto first_return  = glua.Pop<std::string>();
 
     std::cout << "example_callable_from_cpp returned: " << first_return << ", " << second_return << std::endl;
 }
 
-static auto example_reverse_array(kdk::glua::Glua::Ptr glua) -> void
+static auto example_reverse_array(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
     std::vector<BoxedValue> v{BoxedValue{1}, BoxedValue{2}, BoxedValue{3}, BoxedValue{4}, BoxedValue{5}};
-    glua->CallScriptFunction("example_reverse_array", v);
+    glua.CallScriptFunction("example_reverse_array", v);
 
-    auto reversed_array = glua->Pop<std::vector<BoxedValue>>();
+    auto reversed_array = glua.Pop<std::vector<BoxedValue>>();
 
     std::cout << "reverse_array returned:";
     for (auto& val : reversed_array)
@@ -149,26 +149,26 @@ static auto example_reverse_array(kdk::glua::Glua::Ptr glua) -> void
     std::cout << std::endl;
 }
 
-static auto example_mutate_value(kdk::glua::Glua::Ptr glua) -> void
+static auto example_mutate_value(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
     BoxedValue our_value{5};
 
-    glua->CallScriptFunction("example_mutate_value", our_value);
+    glua.CallScriptFunction("example_mutate_value", our_value);
     std::cout << "mutate_boxed_value called without reference, value: " << our_value.GetValue() << std::endl;
 
-    glua->CallScriptFunction("example_mutate_value", std::ref(our_value));
+    glua.CallScriptFunction("example_mutate_value", std::ref(our_value));
     std::cout << "mutate_boxed_value called with reference, value: " << our_value.GetValue() << std::endl;
 }
 
-static auto example_create_and_retrieve_global(kdk::glua::Glua::Ptr glua) -> void
+static auto example_create_and_retrieve_global(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua->CallScriptFunction("example_create_and_retrieve_global");
+    glua.CallScriptFunction("example_create_and_retrieve_global");
 
-    std::cout << "glua global example_lua_global: " << glua->GetGlobal<std::string>("example_lua_global") << std::endl;
+    std::cout << "glua global example_lua_global: " << glua.GetGlobal<std::string>("example_lua_global") << std::endl;
 }
 
 enum class ExampleEnum
@@ -178,12 +178,12 @@ enum class ExampleEnum
     RED   = 3,
     BLACK = 4
 };
-static auto example_enumeration(kdk::glua::Glua::Ptr glua) -> void
+static auto example_enumeration(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua->CallScriptFunction("example_enumeration", ExampleEnum::BLACK);
-    auto ret_val = glua->Pop<ExampleEnum>();
+    glua.CallScriptFunction("example_enumeration", ExampleEnum::BLACK);
+    auto ret_val = glua.Pop<ExampleEnum>();
 
     switch (ret_val)
     {
@@ -214,56 +214,53 @@ private:
     ValueType m_value;
 };
 
-namespace kdk::glua
-{
 template<typename ClassType, typename ValueType>
-struct CustomTypeHandler<TemplateExample<ClassType, ValueType>>
+static auto glua_get(kdk::glua::GluaBase* glua, int stack_index, std::optional<TemplateExample<ClassType, ValueType>>& output)
+    -> void
 {
-    static auto get(lua_State* state, size_t stack_index) -> TemplateExample<ClassType, ValueType>
-    {
-        // get as value type
-        return TemplateExample<ClassType, ValueType>{kdk::glua::Glua::get<ValueType>(state, stack_index)};
-    }
-    static auto push(lua_State* state, TemplateExample<ClassType, ValueType> value) -> void
-    {
-        // get as value type
-        Glua::GetInstanceFromState(state).Push(value.GetValue());
-    }
-};
-} // namespace kdk::glua
-
-static auto example_custom_template_binding(kdk::glua::Glua::Ptr glua) -> void
+    // get as value type
+    output.emplace(kdk::glua::GluaBase::get<ValueType>(glua, stack_index));
+}
+template<typename ClassType, typename ValueType>
+static auto glua_push(kdk::glua::GluaBase* glua, TemplateExample<ClassType, ValueType> value) -> void
 {
-    std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
-
-    glua->CallScriptFunction("example_custom_template_binding", TemplateExample<BoxedValue, std::string>{"herp"});
-    glua->CallScriptFunction("example_custom_template_binding", TemplateExample<ExampleClass, int64_t>{1337});
+    // push as value type
+    kdk::glua::GluaBase::push(glua, value.GetValue());
 }
 
-static auto example_optionals(kdk::glua::Glua::Ptr glua) -> void
+static auto example_custom_template_binding(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    REGISTER_TO_LUA(glua, receive_optional_str);
+    glua.CallScriptFunction("example_custom_template_binding", TemplateExample<BoxedValue, std::string>{"herp"});
+    glua.CallScriptFunction("example_custom_template_binding", TemplateExample<ExampleClass, int64_t>{1337});
+}
+
+static auto example_optionals(kdk::glua::GluaLua& glua) -> void
+{
+    std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
+
+    REGISTER_TO_GLUA(glua, receive_optional_str);
 
     std::optional<std::string> opt_str;
     std::optional<int64_t>     opt_int;
 
-    glua->CallScriptFunction("example_optionals", opt_str, opt_int);
+    glua.CallScriptFunction("example_optionals", opt_str, opt_int);
 
     opt_str = "herp";
     opt_int = 1337;
-    glua->CallScriptFunction("example_optionals", opt_str, opt_int);
+    glua.CallScriptFunction("example_optionals", opt_str, opt_int);
 }
 
 auto main(int argc, char* argv[]) -> int
 {
-    auto glua = kdk::glua::Glua::Create(std::cout);
+    kdk::glua::GluaLua glua{std::cout};
 
     ///////////// ADD CUSTOM BINDINDS HERE /////////////
-    REGISTER_TO_LUA(glua, example_binding);
-    REGISTER_CLASS_TO_LUA(glua, ExampleClass, &ExampleClass::GetValue, &ExampleClass::SetValue, &ExampleClass::Increment);
-    REGISTER_CLASS_TO_LUA(glua, BoxedValue, &BoxedValue::GetValue, &BoxedValue::SetValue);
+    REGISTER_TO_GLUA(glua, example_binding);
+    REGISTER_CLASS_TO_GLUA(
+        glua, ExampleClass, &ExampleClass::GetValue, &ExampleClass::SetValue, &ExampleClass::Increment);
+    REGISTER_CLASS_TO_GLUA(glua, BoxedValue, &BoxedValue::GetValue, &BoxedValue::SetValue);
 
     if (argc != 2)
     {
@@ -278,7 +275,7 @@ auto main(int argc, char* argv[]) -> int
             std::cout << "File [" << argv[1] << "] not found or was invalid" << std::endl;
         }
 
-        glua->RunScript(script);
+        glua.RunScript(script);
 
         example_sandboxed_environment(glua, script);
         example_library_functions(glua);

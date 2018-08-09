@@ -14,16 +14,24 @@ public:
 
     virtual auto GetImplementationData() const -> void* = 0;
 
-    virtual ~ICallable()   = default;
-    ICallable()            = default;
-    ICallable(ICallable&&) = default;
+    virtual ~ICallable()            = default;
+    ICallable()                     = default;
+    ICallable(const ICallable&)     = default;
+    ICallable(ICallable&&) noexcept = default;
+
+    auto operator=(const ICallable&) -> ICallable& = default;
+    auto operator=(ICallable&&) noexcept -> ICallable& = default;
 };
 
 class Callable : public ICallable
 {
 public:
     explicit Callable(std::unique_ptr<ICallable> callable);
-    Callable(Callable&&) = default;
+    Callable(const Callable&)     = delete;
+    Callable(Callable&&) noexcept = default;
+
+    auto operator=(const Callable&) -> Callable& = delete;
+    auto operator=(Callable&&) noexcept -> Callable& = default;
 
     auto Call() const -> void override;
 
@@ -43,8 +51,12 @@ template<typename Functor>
 class FunctorCallable : public ICallable
 {
 public:
-    FunctorCallable(Functor functor) : m_functor(std::move(functor)) {}
-    FunctorCallable(FunctorCallable&&) = default;
+    explicit FunctorCallable(Functor functor) : m_functor(std::move(functor)) {}
+    FunctorCallable(const FunctorCallable&)     = default;
+    FunctorCallable(FunctorCallable&&) noexcept = default;
+
+    auto operator=(const FunctorCallable&) -> FunctorCallable& = default;
+    auto operator=(FunctorCallable&&) noexcept -> FunctorCallable& = default;
 
     auto Call() const -> void override { m_functor(); }
 
@@ -67,13 +79,17 @@ class DeferredArgumentCallable : public ICallable
 {
 public:
     using ReturnType = typename std::invoke_result<Functor, Params...>::type;
-    DeferredArgumentCallable(Functor functor) : m_functor(std::move(functor)) {}
-    DeferredArgumentCallable(DeferredArgumentCallable&&) = default;
+    explicit DeferredArgumentCallable(Functor functor) : m_functor(std::move(functor)) {}
+    DeferredArgumentCallable(const DeferredArgumentCallable&)     = default;
+    DeferredArgumentCallable(DeferredArgumentCallable&&) noexcept = default;
+
+    auto operator=(const DeferredArgumentCallable&) -> DeferredArgumentCallable& = default;
+    auto operator=(DeferredArgumentCallable&&) noexcept -> DeferredArgumentCallable& = default;
 
     template<size_t... Is>
-    auto GetArgumentTuple(std::index_sequence<Is...>) const -> std::tuple<Params...>
+    auto GetArgumentTuple(std::index_sequence<Is...> /*unused*/) const -> std::tuple<Params...>
     {
-        return std::tuple<Params...>{ArgumentStack::template get<Params>(this, Is + 1)...};
+        return std::tuple<Params...>{ArgumentStack::template deferred_argument_get<Params>(this, Is)...};
     }
 
     auto Call() const -> void override
@@ -90,11 +106,11 @@ public:
             {
                 if constexpr (std::is_reference<ReturnType>::value)
                 {
-                    ArgumentStack::push(this, std::ref(std::apply(m_functor, std::move(arg_tuple))));
+                    ArgumentStack::deferred_argument_push(this, std::ref(std::apply(m_functor, std::move(arg_tuple))));
                 }
                 else
                 {
-                    ArgumentStack::push(this, std::apply(m_functor, std::move(arg_tuple)));
+                    ArgumentStack::deferred_argument_push(this, std::apply(m_functor, std::move(arg_tuple)));
                 }
             }
         }
@@ -108,11 +124,11 @@ public:
             {
                 if constexpr (std::is_reference<ReturnType>::value)
                 {
-                    ArgumentStack::push(this, std::ref(m_functor()));
+                    ArgumentStack::deferred_argument_push(this, std::ref(m_functor()));
                 }
                 else
                 {
-                    ArgumentStack::push(this, m_functor());
+                    ArgumentStack::deferred_argument_push(this, m_functor());
                 }
             }
         }
