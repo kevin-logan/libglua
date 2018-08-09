@@ -7,6 +7,8 @@
 
 namespace kdk::glua
 {
+class GluaBase;
+
 template<typename T>
 struct IsReferenceWrapper : std::false_type
 {
@@ -150,10 +152,7 @@ struct GluaResolver<std::unordered_map<std::string, T>>
 template<typename T>
 struct GluaResolver<std::optional<T>>
 {
-    static auto get(GluaBase* glua, int stack_index) -> std::optional<T>
-    {
-        return glua->getOptional<T>(stack_index);
-    }
+    static auto get(GluaBase* glua, int stack_index) -> std::optional<T> { return glua->getOptional<T>(stack_index); }
     static auto is(GluaBase* glua, int stack_index) -> bool
     {
         return GluaResolver<T>::is(glua, stack_index) || glua->isNull(stack_index);
@@ -182,9 +181,10 @@ struct HasCustomGetter : std::false_type
 template<typename T>
 struct HasCustomGetter<
     T,
-    std::void_t<decltype(
-        glua_get(std::declval<GluaBase*>(), std::declval<size_t>(), std::declval<std::optional<std::remove_reference_t<T>>&>()))>>
-    : std::true_type
+    std::void_t<decltype(glua_get(
+        std::declval<kdk::glua::GluaBase*>(),
+        std::declval<int>(),
+        std::declval<std::optional<std::remove_reference_t<T>>&>()))>> : std::true_type
 {
 };
 

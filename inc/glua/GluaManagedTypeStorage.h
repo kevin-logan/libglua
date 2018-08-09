@@ -73,11 +73,18 @@ class ManagedTypeStackAllocated : public IManagedTypeStorage
 {
 public:
     explicit ManagedTypeStackAllocated(T value) : m_value(std::move(value)) {}
-    ManagedTypeStackAllocated(const ManagedTypeStackAllocated&)     = default;
-    ManagedTypeStackAllocated(ManagedTypeStackAllocated&&) noexcept = default;
+    ManagedTypeStackAllocated(const ManagedTypeStackAllocated&) = default;
+    ManagedTypeStackAllocated(ManagedTypeStackAllocated&& move) noexcept(std::is_nothrow_move_constructible<T>::value)
+        : m_value(std::move(move.m_value))
+    {
+    }
 
     auto operator=(const ManagedTypeStackAllocated&) -> ManagedTypeStackAllocated& = default;
-    auto operator=(ManagedTypeStackAllocated&&) noexcept -> ManagedTypeStackAllocated& = default;
+    auto operator=(ManagedTypeStackAllocated&& rhs) noexcept(std::is_nothrow_move_assignable<T>::value)
+        -> ManagedTypeStackAllocated&
+    {
+        m_value = std::move(rhs.m_value);
+    }
 
     auto GetStorageType() const -> ManagedTypeStorage override { return ManagedTypeStorage::STACK_ALLOCATED; }
 

@@ -45,6 +45,7 @@ auto GluaBase::get(GluaBase* glua, int index) -> Type
 template<typename Type>
 auto GluaBase::push(GluaBase* glua, Type&& value) -> void
 {
+    // first check for custom pusher of actual type, not base type
     if constexpr (HasCustomPusher<Type>::value)
     {
         glua_push(glua, std::forward<Type>(value));
@@ -52,6 +53,11 @@ auto GluaBase::push(GluaBase* glua, Type&& value) -> void
     else if constexpr (GluaBaseCanPush<Type>::value)
     {
         glua->push(std::forward<Type>(value));
+    }
+    else if constexpr (IsReferenceWrapper<Type>::value && GluaBaseCanPush<typename RegistryType<Type>::underlying_type>::value)
+    {
+        // reference_wrapper to supported type, just push it's value
+        glua->push(value.get());
     }
     else
     {
@@ -294,7 +300,7 @@ auto GluaBase::push(const std::optional<Type>& value) -> void
 template<typename Type>
 auto GluaBase::pushRegisteredType(Type&& custom_type) -> void
 {
-    if constexpr (std::is_enum<Type>::value)
+    if constexpr (std::is_enum<std::remove_reference_t<std::remove_const_t<Type>>>::value)
     {
         GluaBase::push(this, static_cast<uint64_t>(custom_type));
     }
@@ -302,7 +308,7 @@ auto GluaBase::pushRegisteredType(Type&& custom_type) -> void
     {
         using UnderlyingType = typename RegistryType<Type>::underlying_type;
 
-        auto unique_name_opt = getUniqueClassName<UnderlyingType>();
+        auto unique_name_opt = getUniqueClassName<std::remove_reference_t<std::remove_const_t<UnderlyingType>>>();
 
         if (unique_name_opt.has_value())
         {
@@ -390,14 +396,14 @@ auto GluaBase::getOptional(int stack_index) -> std::optional<Type>
 template<typename Type>
 auto GluaBase::getRegisteredType(int index) -> Type
 {
-    if constexpr (std::is_enum<Type>::value)
+    if constexpr (std::is_enum<std::remove_reference_t<std::remove_const_t<Type>>>::value)
     {
         return static_cast<Type>(GluaBase::get<uint64_t>(this, index));
     }
 
     using UnderlyingType = typename RegistryType<Type>::underlying_type;
 
-    auto unique_name_opt = getUniqueClassName<UnderlyingType>();
+    auto unique_name_opt = getUniqueClassName<std::remove_reference_t<std::remove_const_t<UnderlyingType>>>();
 
     if (unique_name_opt.has_value())
     {
@@ -463,7 +469,7 @@ auto GluaBase::getRegisteredType(int index) -> Type
     }
     else
     {
-        throw exceptions::GluaBaseException(("Attempted to get registered type without valid class name"));
+        throw exceptions::GluaBaseException("Attempted to get registered type without valid class name");
     }
 }
 
