@@ -50,6 +50,11 @@ auto GluaBase::push(GluaBase* glua, Type&& value) -> void
     {
         glua_push(glua, std::forward<Type>(value));
     }
+    else if constexpr (IsReferenceWrapper<Type>::value && HasCustomPusher<typename RegistryType<Type>::underlying_type>::value)
+    {
+        // reference_wrapper to custom type, just push it's value
+        glua_push(glua, value.get());
+    }
     else if constexpr (GluaBaseCanPush<Type>::value)
     {
         glua->push(std::forward<Type>(value));
