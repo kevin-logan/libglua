@@ -98,7 +98,7 @@ add_executable(libglua-examples
 )
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${LUA_INCLUDE_PATH})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glua ${LIBLUA})
+target_link_libraries(${PROJECT_NAME} PRIVATE m dl glua ${LIBLUA})
 
 target_compile_options(
     ${PROJECT_NAME} PRIVATE
