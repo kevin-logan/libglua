@@ -36,3 +36,7 @@ build_release
 *.exe
 *.out
 *.app
+
+# Ignore build directories
+/Debug/
+/Release/
