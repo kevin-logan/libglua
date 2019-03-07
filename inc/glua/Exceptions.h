@@ -18,6 +18,7 @@ namespace kdk::exceptions
 #define KDK_EXCEPTION(name) KDK_DERIVED_EXCEPTION(name, std::runtime_error)
 
 KDK_EXCEPTION(GluaBaseException);
+KDK_EXCEPTION(GluaTypeException);
 KDK_EXCEPTION(LuaException);
 
 } // namespace kdk::exceptions

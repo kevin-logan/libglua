@@ -3,7 +3,7 @@ project (glua)
 
 find_program(CLANG_TIDY_BIN NAMES "clang-tidy" DOC "clang-tidy binary location")
 if(CLANG_TIDY_BIN)
-    set(CLANG_TIDY_COMMAND "${CLANG_TIDY_BIN}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-default-arguments,-google-readability-namespace-comments,-llvm-namespace-comment,-hicpp-no-array-decay,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,-google-default-arguments,-llvm-header-guard,-google-runtime-references,-misc-macro-parentheses" "-header-filter=.*")
+    set(CLANG_TIDY_COMMAND "${CLANG_TIDY_BIN}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator,-fuchsia-trailing-return,-fuchsia-default-arguments,-google-readability-namespace-comments,-llvm-namespace-comment,-hicpp-no-array-decay,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,-google-default-arguments,-llvm-header-guard,-google-runtime-references,-misc-macro-parentheses,-bugprone-macro-parentheses,-bugprone-unused-return-value" "-header-filter=.*")
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ")
@@ -26,7 +26,7 @@ option(D_GLIBCXX_DEBUG "Use D_GLIBCXX_DEBUG when building Debug" ON)
 set(SOURCE_FILES
     inc/glua/Exceptions.h
     inc/glua/FileUtil.h src/FileUtil.cpp
-    inc/glua/GluaBase.h inc/glua/GluaBase.tcc
+    inc/glua/GluaBase.h inc/glua/GluaBase.tcc src/GluaBase.cpp
     inc/glua/GluaBaseHelperTemplates.h src/GluaBaseHelperTemplates.cpp
     inc/glua/GluaCallable.h inc/glua/GluaCallable.tcc
     inc/glua/GluaLua.h src/GluaLua.cpp
