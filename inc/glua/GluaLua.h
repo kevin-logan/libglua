@@ -10,6 +10,11 @@ extern "C" {
 
 namespace kdk::glua
 {
+struct LuaStateDeleter
+{
+    auto operator()(lua_State* state) -> void;
+};
+
 class GluaLua : public GluaBase
 {
 public:
@@ -26,7 +31,7 @@ public:
     GluaLua(GluaLua&&) noexcept = default;
 
     auto operator=(const GluaLua&) -> GluaLua& = delete;
-    auto operator=(GluaLua&&) noexcept -> GluaLua& = delete;
+    auto operator=(GluaLua&&) noexcept -> GluaLua& = default;
 
     /**
      * @brief Retrieves a GluaLua instance from a lua_State object, if that
@@ -104,6 +109,7 @@ protected:
     auto getMapKeys(int stack_index) const -> std::vector<std::string> override;
     auto getMapValue(const std::string& key, int stack_index_of_map) const -> void override;
     auto getUserType(const std::string& unique_type_name, int stack_index) const -> IManagedTypeStorage* override;
+    auto isUserType(const std::string& unique_type_name, int stack_index) const -> bool override;
     auto isNull(int stack_index) const -> bool override;
     auto isBool(int stack_index) const -> bool override;
     auto isInt8(int stack_index) const -> bool override;
@@ -124,6 +130,7 @@ protected:
     auto setGlobalFromStack(const std::string& name, int stack_index) -> void override;
     auto pushGlobal(const std::string& name) -> void override;
     auto popOffStack(size_t count) -> void override;
+    auto getStackTop() -> int override;
     auto callScriptFunctionImpl(const std::string& function_name, size_t arg_count = 0) -> void override;
     auto registerClassImpl(
         const std::string&                                          class_name,
@@ -139,13 +146,13 @@ private:
     auto setValueOfGlobalFromTopOfStack(const std::string& global_name) -> void;
     auto absoluteIndex(int index) const -> int;
 
-    lua_State* m_lua;
+    std::unique_ptr<lua_State, LuaStateDeleter> m_lua;
 
     std::unordered_map<std::string, std::unique_ptr<ICallable>>                                  m_registry;
     std::unordered_map<std::string, std::unordered_map<std::string, std::unique_ptr<ICallable>>> m_method_registry;
     std::unordered_map<std::type_index, std::string> m_class_to_metatable_name;
 
-    std::ostream& m_output_stream;
+    std::reference_wrapper<std::ostream> m_output_stream; // reference wrapper so it's movable
 
     std::optional<size_t>      m_current_array_index;
     std::optional<std::string> m_current_map_key;

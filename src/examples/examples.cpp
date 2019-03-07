@@ -219,13 +219,13 @@ static auto glua_get(kdk::glua::GluaBase* glua, int stack_index, std::optional<T
     -> void
 {
     // get as value type
-    output.emplace(kdk::glua::GluaBase::get<ValueType>(glua, stack_index));
+    output.emplace(glua->Get<ValueType>(stack_index));
 }
 template<typename ClassType, typename ValueType>
 static auto glua_push(kdk::glua::GluaBase* glua, TemplateExample<ClassType, ValueType> value) -> void
 {
     // push as value type
-    kdk::glua::GluaBase::push(glua, value.GetValue());
+    glua->Push(value.GetValue());
 }
 
 static auto example_custom_template_binding(kdk::glua::GluaLua& glua) -> void
@@ -250,6 +250,52 @@ static auto example_optionals(kdk::glua::GluaLua& glua) -> void
     opt_str = "herp";
     opt_int = 1337;
     glua.CallScriptFunction("example_optionals", opt_str, opt_int);
+}
+
+static auto example_nested_table(kdk::glua::GluaLua& glua) -> void
+{
+    std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
+
+    glua.CallScriptFunction("example_nested_table");
+    {
+        /* now a table like this is on the stack:
+        {
+            level_one = {
+                level_two = {
+                    level_three = {
+                        value = 1337
+                    },
+                    value = 3
+                },
+                value = 2
+            },
+            value = 1
+        }
+        */
+        auto first_value      = glua.SafeGetChild<int32_t>(-1, "value");
+        auto first_nest_index = glua.SafePushChild(-1, "level_one");
+        {
+            auto second_value      = glua.SafeGetChild<int32_t>(first_nest_index, "value");
+            auto second_nest_index = glua.SafePushChild(first_nest_index, "level_two");
+            {
+                auto third_value      = glua.SafeGetChild<int32_t>(second_nest_index, "value");
+                auto third_nest_index = glua.SafePushChild(second_nest_index, "level_three");
+                {
+                    auto final_value = glua.SafeGetChild<int32_t>(third_nest_index, "value");
+
+                    std::cout << __PRETTY_FUNCTION__ << " results:" << std::endl;
+                    std::cout << "\tgot outmost value: " << first_value << std::endl;
+                    std::cout << "\tgot level_one value: " << second_value << std::endl;
+                    std::cout << "\tgot level_two value: " << third_value << std::endl;
+                    std::cout << "\tgot level_three value: " << final_value << std::endl;
+                }
+                glua.Pop<void>(); // third_nest_index
+            }
+            glua.Pop<void>(); // second_nest_index
+        }
+        glua.Pop<void>(); // first_nest_index
+    }
+    glua.Pop<void>(); // pop actual return value from script function
 }
 
 auto main(int argc, char* argv[]) -> int
@@ -290,6 +336,7 @@ auto main(int argc, char* argv[]) -> int
         example_enumeration(glua);
         example_custom_template_binding(glua);
         example_optionals(glua);
+        example_nested_table(glua);
     }
 
     return 0;

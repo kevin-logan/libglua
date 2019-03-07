@@ -94,26 +94,162 @@ public:
     /*****************************************************************************/
 
     /**
-     * @brief gets a value of the requested Type off the stack at the given index
+     * @brief pushes a given value onto the stack and returns the index of the new value
      *
-     * @tparam Type the type of the value that should be retrieved
-     * @param glua the instance of glua to get the value from
+     * @tparam Type the type  of the value to push
+     * @param value the value to push onto the stack
+     *
+     * @return the index of the new value on the stack
+     */
+    template<typename Type>
+    auto Push(Type&& value) -> int;
+
+    /**
+     * @brief pushes a child object of the given object onto the stack. The object at
+     * `parent_index` must have a child with `child_index`, which will be pushed on the
+     * stack, otherwise a null value is pushed onto the stack.
+     *
+     * @param parent_index the stack index of the parent object
+     * @param child_index the index of the child within the object at `parent_index`
+     * to push onto the stack
+     * @return the stack index of the retrieved child
+     */
+    auto PushChild(int parent_index, size_t child_index) -> int;
+
+    /**
+     * @brief pushes a child object of the given object onto the stack. The object at
+     * `parent_index` must have a child with `child_key`, which will be pushed on the
+     * stack, otherwise a null value is pushed onto the stack.
+     *
+     * @param parent_index the stack index of the parent object
+     * @param child_key the key of the child within the object at `parent_index`
+     * to push onto the stack
+     * @return the stack index of the retrieved child
+     */
+    auto PushChild(int parent_index, const std::string& child_key) -> int;
+
+    /**
+     * @brief pushes a child object of the given object onto the stack. The object at
+     * `parent_index` must have a child with `child_index`, which will be pushed on the
+     * stack, otherwise an std::out_of_range is thrown.
+     *
+     * @param parent_index the stack index of the parent object
+     * @param child_index the index of the child within the object at `parent_index`
+     * to push onto the stack
+     * @return the stack index of the retrieved child
+     *
+     * @throws std::out_of_range if no such child exists
+     */
+    auto SafePushChild(int parent_index, size_t child_index) -> int;
+
+    /**
+     * @brief pushes a child object of the given object onto the stack. The object at
+     * `parent_index` must have a child with `child_key`, which will be pushed on the
+     * stack, otherwise an std::out_of_range is thrown.
+     *
+     * @param parent_index the stack index of the parent object
+     * @param child_key the key of the child within the object at `parent_index`
+     * to push onto the stack
+     * @return the stack index of the retrieved child
+     *
+     * @throws std::out_of_range if no such child exists
+     */
+    auto SafePushChild(int parent_index, const std::string& child_key) -> int;
+
+    /**
+     * @brief Gets the value of a child object of the given object as `Type`. The object at
+     * `parent_index` must have a child with `child_index`, otherwise the value will be
+     * converted from null.
+     *
+     * @tparam Type the type to convert the value of the child to
+     * @param parent_index the stack index of the parent object
+     * @param child_index the index of the child within the object at `parent_index`
+     * to get the value for
+     * @return the converted value
+     */
+    template<typename Type>
+    auto GetChild(int parent_index, size_t child_index) -> Type;
+    /**
+     * @brief Gets the value of a child object of the given object as `Type`. The object at
+     * `parent_index` must have a child with `child_key`, otherwise the value will be
+     * converted from null.
+     *
+     * @tparam Type the type to convert the value of the child to
+     * @param parent_index the stack index of the parent object
+     * @param child_key the key of the child within the object at `parent_index`
+     * to get the value for
+     * @return the converted value
+     */
+    template<typename Type>
+    auto GetChild(int parent_index, const std::string& child_key) -> Type;
+    /**
+     * @brief Gets the value of a child object of the given object as `Type`. The object at
+     * `parent_index` must have a child with `child_index`, otherwise std::out_of_range is
+     * thrown. If the child at the given index is not already of type `Type` then a
+     * std::runtime_error is thrown.
+     *
+     * @tparam Type the type to get the value of the child as
+     * @param parent_index the stack index of the parent object
+     * @param child_index the index of the child within the object at `parent_index`
+     * to get the value for
+     * @return the child's value
+     */
+    template<typename Type>
+    auto SafeGetChild(int parent_index, size_t child_index) -> Type;
+    /**
+     * @brief Gets the value of a child object of the given object as `Type`. The object at
+     * `parent_index` must have a child with `child_key`, otherwise std::out_of_range is
+     * thrown. If the child at the given key is not already of type `Type` then a
+     * std::runtime_error is thrown.
+     *
+     * @tparam Type the type to convert the value of the child to
+     * @param parent_index the stack index of the parent object
+     * @param child_key the key of the child within the object at `parent_index`
+     * to get the value for
+     * @return the child's value
+     */
+    template<typename Type>
+    auto SafeGetChild(int parent_index, const std::string& child_key) -> Type;
+
+    /**
+     * @brief checks if a value of the requested Type is on the stack at the given index
+     *
+     * @tparam Type the type of the value that should be checked for
+     * @param index the index of the element to check (negative indices work from
+     *              the top of the stack, e.g. -1  is the top of the stack, 0 is the
+     *              bottom, and 1 is 1 from the bottom)
+     * @return true if the value at that index is of the given Type
+     */
+    template<typename Type>
+    auto Is(int stack_index) -> bool;
+
+    /**
+     * @brief Gets the value of the item at the given position in the stack and converts
+     * it to `Type`
+     *
+     * @tparam Type the type of the value that it should be converted to
      * @param index the index of the element to retrieve (negative indices work from
      *              the top of the stack, e.g. -1  is the top of the stack, 0 is the
      *              bottom, and 1 is 1 from the bottom)
-     * @return Type the requested value at that index
+     * @return the value at the given index converted to `Type`
      */
     template<typename Type>
-    static auto get(GluaBase* glua, int index) -> Type;
+    auto As(int stack_index) -> Type;
+
     /**
-     * @brief pushes a given value onto the stack
+     * @brief Gets the value of the item at the given position in the stack and checks to
+     * make sure it is of type `Type`. If so it is returned, otherwise an error is thrown
      *
-     * @tparam Type the type  of the value to push
-     * @param glua the instance of glua to push the value for
-     * @param value the value to push onto the stack
+     *
+     * @tparam Type the type of the value that it should be retrieved as
+     * @param index the index of the element to retrieve (negative indices work from
+     *              the top of the stack, e.g. -1  is the top of the stack, 0 is the
+     *              bottom, and 1 is 1 from the bottom)
+     * @return the value at the given index of type `Type`
+     * @throws std::runtime_error if the value at the given index is not of type `Type`
      */
     template<typename Type>
-    static auto push(GluaBase* glua, Type&& value) -> void;
+    auto Get(int stack_index) -> Type;
 
     /**
      * @brief Gets the value at the top of the stack and pops it off the stack
@@ -144,6 +280,15 @@ public:
      */
     template<typename T>
     auto GetGlobal(const std::string& name) -> T;
+
+    /**
+     * @brief Retrieves the value of the requested global from the scripting environment
+     * and pushes it on the variable stack. The index of the global is returned.
+     *
+     * @param name the name of the global in the scripting environment to retrieve
+     * @return the index of the retrieved global on the variable stack
+     */
+    auto PushGlobal(const std::string& name) -> int;
 
     /**
      * @brief Creates a callable object as a GluaCallable from the given functor, so it
@@ -296,6 +441,7 @@ protected:
     virtual auto getMapKeys(int stack_index) const -> std::vector<std::string>                                   = 0;
     virtual auto getMapValue(const std::string& key, int stack_index_of_map) const -> void                       = 0;
     virtual auto getUserType(const std::string& unique_type_name, int stack_index) const -> IManagedTypeStorage* = 0;
+    virtual auto isUserType(const std::string& unique_type_name, int stack_index) const -> bool                  = 0;
     virtual auto isNull(int stack_index) const -> bool                                                           = 0;
     virtual auto isBool(int stack_index) const -> bool                                                           = 0;
     virtual auto isInt8(int stack_index) const -> bool                                                           = 0;
@@ -316,6 +462,7 @@ protected:
     virtual auto setGlobalFromStack(const std::string& name, int stack_index) -> void                            = 0;
     virtual auto pushGlobal(const std::string& name) -> void                                                     = 0;
     virtual auto popOffStack(size_t count) -> void                                                               = 0;
+    virtual auto getStackTop() -> int                                                                            = 0;
     virtual auto callScriptFunctionImpl(const std::string& function_name, size_t arg_count = 0) -> void          = 0;
     virtual auto registerClassImpl(
         const std::string&                                          class_name,
@@ -346,6 +493,8 @@ private:
 
     template<typename Type>
     auto getRegisteredType(int index) -> Type;
+    template<typename Type>
+    auto isRegisteredType(int index) -> bool;
 
     template<typename T>
     auto getUniqueClassName() const -> std::optional<std::reference_wrapper<const std::string>>;
