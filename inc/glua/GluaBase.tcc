@@ -8,23 +8,120 @@ template<typename Type>
 auto GluaBase::deferred_argument_get(const ICallable* callable, size_t index) -> Type
 {
     auto* glua_ptr = static_cast<GluaBase*>(callable->GetImplementationData());
-    return GluaBase::get<Type>(glua_ptr, glua_ptr->transformFunctionParameterIndex(index));
+    return glua_ptr->Get<Type>(glua_ptr->transformFunctionParameterIndex(index));
 }
 template<typename Type>
 auto GluaBase::deferred_argument_push(const ICallable* callable, Type&& value) -> void
 {
     auto* glua_ptr = static_cast<GluaBase*>(callable->GetImplementationData());
-    GluaBase::push(glua_ptr, std::forward<Type>(value));
+    glua_ptr->Push(std::forward<Type>(value));
 }
 /*************************************************************/
 
 template<typename Type>
-auto GluaBase::get(GluaBase* glua, int index) -> Type
+auto GluaBase::Push(Type&& value) -> int
+{
+    // first check for custom pusher of actual type, not base type
+    if constexpr (HasCustomPusher<Type>::value)
+    {
+        glua_push(this, std::forward<Type>(value));
+    }
+    else if constexpr (IsReferenceWrapper<Type>::value && HasCustomPusher<typename RegistryType<Type>::underlying_type>::value)
+    {
+        // reference_wrapper to custom type, just push it's value
+        glua_push(this, value.get());
+    }
+    else if constexpr (GluaBaseCanPush<Type>::value)
+    {
+        push(std::forward<Type>(value));
+    }
+    else if constexpr (IsReferenceWrapper<Type>::value && GluaBaseCanPush<typename RegistryType<Type>::underlying_type>::value)
+    {
+        // reference_wrapper to supported type, just push it's value
+        push(value.get());
+    }
+    else
+    {
+        // some kind of complex type
+        pushRegisteredType(std::forward<Type>(value));
+    }
+
+    return getStackTop();
+}
+template<typename Type>
+auto GluaBase::GetChild(int parent_index, size_t child_index) -> Type
+{
+    auto result_index = PushChild(parent_index, child_index);
+
+    auto retval = As<Type>(result_index);
+
+    popOffStack(1);
+
+    return retval;
+}
+
+template<typename Type>
+auto GluaBase::GetChild(int parent_index, const std::string& child_key) -> Type
+{
+    auto result_index = PushChild(parent_index, child_key);
+
+    auto retval = As<Type>(result_index);
+
+    popOffStack(1);
+
+    return retval;
+}
+
+template<typename Type>
+auto GluaBase::SafeGetChild(int parent_index, size_t child_index) -> Type
+{
+    auto result_index = SafePushChild(parent_index, child_index);
+
+    auto retval = Get<Type>(result_index);
+
+    popOffStack(1);
+
+    return retval;
+}
+
+template<typename Type>
+auto GluaBase::SafeGetChild(int parent_index, const std::string& child_key) -> Type
+{
+    auto result_index = SafePushChild(parent_index, child_key);
+
+    auto retval = Get<Type>(result_index);
+
+    popOffStack(1);
+
+    return retval;
+}
+
+template<typename Type>
+auto GluaBase::Is(int stack_index) -> bool
 {
     if constexpr (HasCustomGetter<Type>::value)
     {
         std::optional<Type> result;
-        glua_get(glua, index, result);
+        glua_get(this, stack_index, result);
+
+        return result.has_value();
+    }
+
+    if constexpr (GluaCanResolve<Type>::value)
+    {
+        return GluaResolver<Type>::is(this, stack_index);
+    }
+
+    return isRegisteredType<Type>(stack_index);
+}
+
+template<typename Type>
+auto GluaBase::As(int stack_index) -> Type
+{
+    if constexpr (HasCustomGetter<Type>::value)
+    {
+        std::optional<Type> result;
+        glua_get(this, stack_index, result);
 
         if (!result.has_value())
         {
@@ -36,45 +133,44 @@ auto GluaBase::get(GluaBase* glua, int index) -> Type
 
     if constexpr (GluaCanResolve<Type>::value)
     {
-        return GluaResolver<Type>::get(glua, index);
+        return GluaResolver<Type>::get(this, stack_index);
     }
 
-    return glua->getRegisteredType<Type>(index);
+    return getRegisteredType<Type>(stack_index);
 }
 
 template<typename Type>
-auto GluaBase::push(GluaBase* glua, Type&& value) -> void
+auto GluaBase::Get(int stack_index) -> Type
 {
-    // first check for custom pusher of actual type, not base type
-    if constexpr (HasCustomPusher<Type>::value)
+    if (Is<Type>(stack_index))
     {
-        glua_push(glua, std::forward<Type>(value));
+        return As<Type>(stack_index);
     }
-    else if constexpr (IsReferenceWrapper<Type>::value && HasCustomPusher<typename RegistryType<Type>::underlying_type>::value)
-    {
-        // reference_wrapper to custom type, just push it's value
-        glua_push(glua, value.get());
-    }
-    else if constexpr (GluaBaseCanPush<Type>::value)
-    {
-        glua->push(std::forward<Type>(value));
-    }
-    else if constexpr (IsReferenceWrapper<Type>::value && GluaBaseCanPush<typename RegistryType<Type>::underlying_type>::value)
-    {
-        // reference_wrapper to supported type, just push it's value
-        glua->push(value.get());
-    }
-    else
-    {
-        // some kind of complex type
-        glua->pushRegisteredType(std::forward<Type>(value));
-    }
+
+    throw std::runtime_error("GluaBase::Get with invalid type");
 }
 
 template<typename T>
 auto GluaBase::Pop() -> T
 {
-    auto val = GluaBase::get<T>(this, -1);
+    if constexpr (std::is_same<T, void>::value)
+    {
+        popOffStack(1);
+    }
+    else
+    {
+        auto val = Get<T>(-1);
+        popOffStack(1);
+
+        return val;
+    }
+}
+
+template<typename T>
+auto GluaBase::GetGlobal(const std::string& name) -> T
+{
+    pushGlobal(name);
+    auto val = Get<T>(-1);
     popOffStack(1);
 
     return val;
@@ -83,19 +179,9 @@ auto GluaBase::Pop() -> T
 template<typename T>
 auto GluaBase::SetGlobal(const std::string& name, T value) -> void
 {
-    GluaBase::push(this, std::move(value));
+    Push(std::move(value));
     setGlobalFromStack(name, -1);
     popOffStack(1); // pop off the value we pushed
-}
-
-template<typename T>
-auto GluaBase::GetGlobal(const std::string& name) -> T
-{
-    pushGlobal(name);
-    auto val = GluaBase::get<T>(this, -1);
-    popOffStack(1);
-
-    return val;
 }
 
 template<typename Functor, typename... Params>
@@ -259,7 +345,7 @@ template<typename... Params>
 auto GluaBase::CallScriptFunction(const std::string& function_name, Params&&... params) -> void
 {
     // push all params onto the stack
-    ((GluaBase::push<Params>(this, std::forward<Params>(params))), ...);
+    ((Push(std::forward<Params>(params))), ...);
 
     callScriptFunctionImpl(function_name, sizeof...(params));
 }
@@ -272,8 +358,8 @@ auto GluaBase::push(const std::vector<Type>& value) -> void
 
     for (size_t i = 0; i < size; ++i)
     {
-        GluaBase::push(this, transformObjectIndex(i));
-        GluaBase::push(this, value[i]);
+        Push(transformObjectIndex(i));
+        Push(value[i]);
         arraySetFromStack();
     }
 }
@@ -284,8 +370,8 @@ auto GluaBase::push(const std::unordered_map<std::string, Type>& value) -> void
 
     for (const auto& item_pair : value)
     {
-        GluaBase::push(this, item_pair.first);
-        GluaBase::push(this, item_pair.second);
+        Push(item_pair.first);
+        Push(item_pair.second);
         mapSetFromStack();
     }
 }
@@ -294,7 +380,7 @@ auto GluaBase::push(const std::optional<Type>& value) -> void
 {
     if (value.has_value())
     {
-        GluaBase::push(this, value.value());
+        Push(value.value());
     }
     else
     {
@@ -307,7 +393,7 @@ auto GluaBase::pushRegisteredType(Type&& custom_type) -> void
 {
     if constexpr (std::is_enum<std::remove_reference_t<std::remove_const_t<Type>>>::value)
     {
-        GluaBase::push(this, static_cast<uint64_t>(custom_type));
+        Push(static_cast<uint64_t>(custom_type));
     }
     else
     {
@@ -364,7 +450,7 @@ auto GluaBase::getArray(int stack_index) -> std::vector<Type>
     {
         // pushes array value onto stack
         getArrayValue(transformObjectIndex(i), stack_index);
-        result.push_back(GluaBase::get<Type>(this, -1)); // top of stack is now our value
+        result.push_back(Get<Type>(-1)); // top of stack is now our value
         // pop the value back off thestack
         popOffStack(1);
     }
@@ -382,10 +468,12 @@ auto GluaBase::getStringMap(int stack_index) -> std::unordered_map<std::string, 
     for (auto& map_key : map_keys)
     {
         getMapValue(map_key, stack_index);
-        result[std::move(map_key)] = GluaBase::get<Type>(this, -1); // after GetMapValue top of stack should be value
+        result[std::move(map_key)] = Get<Type>(-1); // after GetMapValue top of stack should be value
         // pop map value off stack
         popOffStack(1);
     }
+
+    return result;
 }
 template<typename Type>
 auto GluaBase::getOptional(int stack_index) -> std::optional<Type>
@@ -395,7 +483,7 @@ auto GluaBase::getOptional(int stack_index) -> std::optional<Type>
         return std::nullopt;
     }
 
-    return GluaBase::get<Type>(this, stack_index);
+    return Get<Type>(stack_index);
 }
 
 template<typename Type>
@@ -403,7 +491,7 @@ auto GluaBase::getRegisteredType(int index) -> Type
 {
     if constexpr (std::is_enum<std::remove_reference_t<std::remove_const_t<Type>>>::value)
     {
-        return static_cast<Type>(GluaBase::get<uint64_t>(this, index));
+        return static_cast<Type>(Get<uint64_t>(index));
     }
 
     using UnderlyingType = typename RegistryType<Type>::underlying_type;
@@ -475,6 +563,28 @@ auto GluaBase::getRegisteredType(int index) -> Type
     else
     {
         throw exceptions::GluaBaseException("Attempted to get registered type without valid class name");
+    }
+}
+
+template<typename Type>
+auto GluaBase::isRegisteredType(int index) -> bool
+{
+    if constexpr (std::is_enum<std::remove_reference_t<std::remove_const_t<Type>>>::value)
+    {
+        return isUInt64(index);
+    }
+
+    using UnderlyingType = typename RegistryType<Type>::underlying_type;
+
+    auto unique_name_opt = getUniqueClassName<std::remove_reference_t<std::remove_const_t<UnderlyingType>>>();
+
+    if (unique_name_opt.has_value())
+    {
+        return isUserType(unique_name_opt.value(), index);
+    }
+    else
+    {
+        throw exceptions::GluaBaseException("Attempted to check against a registered type without valid class name");
     }
 }
 
