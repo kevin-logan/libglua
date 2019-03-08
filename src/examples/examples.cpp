@@ -123,11 +123,11 @@ static auto example_callable_from_cpp(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua.CallScriptFunction("example_callable_from_cpp", 1337, "herpaderp");
+    auto retvals = glua.CallScriptFunction("example_callable_from_cpp", 1337, "herpaderp");
 
     // expect two return values
-    auto second_return = glua.Pop<int64_t>();
-    auto first_return  = glua.Pop<std::string>();
+    auto first_return  = retvals[0].As<std::string>();
+    auto second_return = retvals[1].As<int64_t>();
 
     std::cout << "example_callable_from_cpp returned: " << first_return << ", " << second_return << std::endl;
 }
@@ -137,9 +137,9 @@ static auto example_reverse_array(kdk::glua::GluaLua& glua) -> void
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
     std::vector<BoxedValue> v{BoxedValue{1}, BoxedValue{2}, BoxedValue{3}, BoxedValue{4}, BoxedValue{5}};
-    glua.CallScriptFunction("example_reverse_array", v);
+    auto                    retvals = glua.CallScriptFunction("example_reverse_array", v);
 
-    auto reversed_array = glua.Pop<std::vector<BoxedValue>>();
+    auto reversed_array = retvals[0].As<std::vector<BoxedValue>>();
 
     std::cout << "reverse_array returned:";
     for (auto& val : reversed_array)
@@ -182,8 +182,8 @@ static auto example_enumeration(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua.CallScriptFunction("example_enumeration", ExampleEnum::BLACK);
-    auto ret_val = glua.Pop<ExampleEnum>();
+    auto retvals = glua.CallScriptFunction("example_enumeration", ExampleEnum::BLACK);
+    auto ret_val = retvals[0].As<ExampleEnum>();
 
     switch (ret_val)
     {
@@ -256,7 +256,8 @@ static auto example_nested_table(kdk::glua::GluaLua& glua) -> void
 {
     std::cout << std::endl << __FUNCTION__ << " starting..." << std::endl;
 
-    glua.CallScriptFunction("example_nested_table");
+    auto  retvals      = glua.CallScriptFunction("example_nested_table");
+    auto& return_table = retvals[0];
     {
         /* now a table like this is on the stack:
         {
@@ -272,16 +273,16 @@ static auto example_nested_table(kdk::glua::GluaLua& glua) -> void
             value = 1
         }
         */
-        auto first_value      = glua.SafeGetChild<int32_t>(-1, "value");
-        auto first_nest_index = glua.SafePushChild(-1, "level_one");
+        auto first_value      = return_table.PushChild("value").Get<int32_t>();
+        auto first_nest_index = return_table.PushChild("level_one");
         {
-            auto second_value      = glua.SafeGetChild<int32_t>(first_nest_index, "value");
-            auto second_nest_index = glua.SafePushChild(first_nest_index, "level_two");
+            auto second_value      = first_nest_index.PushChild("value").Get<int32_t>();
+            auto second_nest_index = first_nest_index.PushChild("level_two");
             {
-                auto third_value      = glua.SafeGetChild<int32_t>(second_nest_index, "value");
-                auto third_nest_index = glua.SafePushChild(second_nest_index, "level_three");
+                auto third_value      = second_nest_index.PushChild("value").Get<int32_t>();
+                auto third_nest_index = second_nest_index.PushChild("level_three");
                 {
-                    auto final_value = glua.SafeGetChild<int32_t>(third_nest_index, "value");
+                    auto final_value = third_nest_index.PushChild("value").Get<int32_t>();
 
                     std::cout << __PRETTY_FUNCTION__ << " results:" << std::endl;
                     std::cout << "\tgot outmost value: " << first_value << std::endl;
@@ -289,13 +290,9 @@ static auto example_nested_table(kdk::glua::GluaLua& glua) -> void
                     std::cout << "\tgot level_two value: " << third_value << std::endl;
                     std::cout << "\tgot level_three value: " << final_value << std::endl;
                 }
-                glua.Pop<void>(); // third_nest_index
             }
-            glua.Pop<void>(); // second_nest_index
         }
-        glua.Pop<void>(); // first_nest_index
     }
-    glua.Pop<void>(); // pop actual return value from script function
 }
 
 auto main(int argc, char* argv[]) -> int

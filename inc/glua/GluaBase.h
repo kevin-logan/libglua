@@ -4,6 +4,7 @@
 #include "glua/GluaCallable.h"
 #include "glua/GluaManagedTypeStorage.h"
 #include "glua/ICallable.h"
+#include "glua/StackPosition.h"
 #include "glua/StringUtil.h"
 
 #include <optional>
@@ -112,9 +113,9 @@ public:
      * @param parent_index the stack index of the parent object
      * @param child_index the index of the child within the object at `parent_index`
      * to push onto the stack
-     * @return the stack index of the retrieved child
+     * @return the stack position of the retrieved child
      */
-    auto PushChild(int parent_index, size_t child_index) -> int;
+    auto PushChild(int parent_index, size_t child_index) -> StackPosition;
 
     /**
      * @brief pushes a child object of the given object onto the stack. The object at
@@ -124,9 +125,9 @@ public:
      * @param parent_index the stack index of the parent object
      * @param child_key the key of the child within the object at `parent_index`
      * to push onto the stack
-     * @return the stack index of the retrieved child
+     * @return the stack position of the retrieved child
      */
-    auto PushChild(int parent_index, const std::string& child_key) -> int;
+    auto PushChild(int parent_index, const std::string& child_key) -> StackPosition;
 
     /**
      * @brief pushes a child object of the given object onto the stack. The object at
@@ -136,11 +137,11 @@ public:
      * @param parent_index the stack index of the parent object
      * @param child_index the index of the child within the object at `parent_index`
      * to push onto the stack
-     * @return the stack index of the retrieved child
+     * @return the stack position of the retrieved child
      *
      * @throws std::out_of_range if no such child exists
      */
-    auto SafePushChild(int parent_index, size_t child_index) -> int;
+    auto SafePushChild(int parent_index, size_t child_index) -> StackPosition;
 
     /**
      * @brief pushes a child object of the given object onto the stack. The object at
@@ -150,11 +151,11 @@ public:
      * @param parent_index the stack index of the parent object
      * @param child_key the key of the child within the object at `parent_index`
      * to push onto the stack
-     * @return the stack index of the retrieved child
+     * @return the stack position of the retrieved child
      *
      * @throws std::out_of_range if no such child exists
      */
-    auto SafePushChild(int parent_index, const std::string& child_key) -> int;
+    auto SafePushChild(int parent_index, const std::string& child_key) -> StackPosition;
 
     /**
      * @brief Gets the value of a child object of the given object as `Type`. The object at
@@ -283,12 +284,12 @@ public:
 
     /**
      * @brief Retrieves the value of the requested global from the scripting environment
-     * and pushes it on the variable stack. The index of the global is returned.
+     * and pushes it on the variable stack. The stack position of the global is returned.
      *
      * @param name the name of the global in the scripting environment to retrieve
-     * @return the index of the retrieved global on the variable stack
+     * @return the stack position of the retrieved global on the variable stack
      */
-    auto PushGlobal(const std::string& name) -> int;
+    auto PushGlobal(const std::string& name) -> StackPosition;
 
     /**
      * @brief Creates a callable object as a GluaCallable from the given functor, so it
@@ -390,9 +391,11 @@ public:
      * @tparam Params the types of the parameters passed
      * @param function_name the name of the function in the scripting environment to call
      * @param params the parameter values to call the function with
+     *
+     * @return a vector of the stack positions of all return arguments
      */
     template<typename... Params>
-    auto CallScriptFunction(const std::string& function_name, Params&&... params) -> void;
+    auto CallScriptFunction(const std::string& function_name, Params&&... params) -> std::vector<StackPosition>;
 
     /**
      * @brief defaulted virtual destructor
@@ -511,5 +514,8 @@ private:
 };
 
 } // namespace kdk::glua
+
+// include stack position implementation to avoid circular dependency
+#include "glua/StackPosition.tcc"
 
 #include "glua/GluaBase.tcc"

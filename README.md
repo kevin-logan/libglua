@@ -137,16 +137,16 @@ end
 You can call `example_callable_from_cpp` from C++ like so:
 ```C++
 glua.RunFile("example.lua");
-glua.CallScriptFunction("example_callable_from_cpp", 1337, "herpaderp");
+auto retvals = glua.CallScriptFunction("example_callable_from_cpp", 1337, "herpaderp");
 ```
-`GluaBase::CallScriptFunction` takes first the name of the function to call, and then any arguments you wish to pass to that function. The return value, however, is pushed onto the stack and not automatically returned for you (as a lua function could actually returned multiple arguments, which is precisely what is happening in this case).
+`GluaBase::CallScriptFunction` takes first the name of the function to call, and then any arguments you wish to pass to that function. The return valuesare pushed onto the stack and automatically returned for you (as a lua function could actually returned multiple arguments, which is precisely what is happening in this case).
 
-To get the return values, you must pop them off manually, providing the types you expect them in:
+To get the return values, you can read the items returned, providing the types you expect them in:
 
 ```C++
 // expect two return values
-auto second_return = glua.Pop<int64_t>();
-auto first_return  = glua.Pop<std::string>();
+auto first_return  = retvals[0].As<std::string>();
+auto second_return = retvals[1].As<int64_t>();
 
 std::cout << "example_callable_from_cpp returned: " << first_return << ", " << second_return << std::endl;
 ```
