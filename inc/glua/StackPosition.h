@@ -94,7 +94,7 @@ public:
     auto SafePushChild(size_t child_index) -> StackPosition;
     /**
      * Pushes the child of this object with the given key onto the stack
-     * and returns a StackPosition referring to it.If the child doesn't
+     * and returns a StackPosition referring to it. If the child doesn't
      * exist an exception is thrown.
      *
      * @param child_key the key of the child to push onto the stack
@@ -117,7 +117,7 @@ public:
     auto As() -> Type;
 
     /**
-     * @tparam Type the Type this value against
+     * @tparam Type the Type this value is checked against
      * @return true if the item this position refers to is of the given type
      */
     template<typename Type>

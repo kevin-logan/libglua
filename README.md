@@ -139,7 +139,7 @@ You can call `example_callable_from_cpp` from C++ like so:
 glua.RunFile("example.lua");
 auto retvals = glua.CallScriptFunction("example_callable_from_cpp", 1337, "herpaderp");
 ```
-`GluaBase::CallScriptFunction` takes first the name of the function to call, and then any arguments you wish to pass to that function. The return valuesare pushed onto the stack and automatically returned for you (as a lua function could actually returned multiple arguments, which is precisely what is happening in this case).
+`GluaBase::CallScriptFunction` takes first the name of the function to call, and then any arguments you wish to pass to that function. The return values are pushed onto the stack and automatically returned for you (as a lua function could actually returned multiple arguments, which is precisely what is happening in this case).
 
 To get the return values, you can read the items returned, providing the types you expect them in:
 
