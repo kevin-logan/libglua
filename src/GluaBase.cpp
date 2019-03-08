@@ -2,14 +2,14 @@
 
 namespace kdk::glua
 {
-auto GluaBase::PushChild(int parent_index, size_t child_index) -> int
+auto GluaBase::PushChild(int parent_index, size_t child_index) -> StackPosition
 {
     getArrayValue(child_index, parent_index);
 
-    return getStackTop();
+    return StackPosition{this, getStackTop()};
 }
 
-auto GluaBase::SafePushChild(int parent_index, size_t child_index) -> int
+auto GluaBase::SafePushChild(int parent_index, size_t child_index) -> StackPosition
 {
     getArrayValue(child_index, parent_index);
 
@@ -20,17 +20,17 @@ auto GluaBase::SafePushChild(int parent_index, size_t child_index) -> int
         throw std::out_of_range("GluaBase::SafePushChild with unset index");
     }
 
-    return result_index;
+    return StackPosition{this, result_index};
 }
 
-auto GluaBase::PushChild(int parent_index, const std::string& child_key) -> int
+auto GluaBase::PushChild(int parent_index, const std::string& child_key) -> StackPosition
 {
     getMapValue(child_key, parent_index);
 
-    return getStackTop();
+    return StackPosition{this, getStackTop()};
 }
 
-auto GluaBase::SafePushChild(int parent_index, const std::string& child_key) -> int
+auto GluaBase::SafePushChild(int parent_index, const std::string& child_key) -> StackPosition
 {
     getMapValue(child_key, parent_index);
 
@@ -41,14 +41,13 @@ auto GluaBase::SafePushChild(int parent_index, const std::string& child_key) -> 
         throw std::out_of_range("GluaBase::SafePushChild with unset key");
     }
 
-    return result_index;
+    return StackPosition{this, result_index};
 }
 
-auto GluaBase::PushGlobal(const std::string& name) -> int
+auto GluaBase::PushGlobal(const std::string& name) -> StackPosition
 {
     pushGlobal(name);
 
-    return getStackTop();
+    return StackPosition{this, getStackTop()};
 }
-
 } // namespace kdk::glua
