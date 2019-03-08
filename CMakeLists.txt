@@ -31,6 +31,7 @@ set(SOURCE_FILES
     inc/glua/GluaCallable.h inc/glua/GluaCallable.tcc
     inc/glua/GluaLua.h src/GluaLua.cpp
     inc/glua/GluaManagedTypeStorage.h
+    inc/glua/StackPosition.h inc/glua/StackPosition.tcc src/StackPosition.cpp
     inc/glua/ICallable.h src/ICallable.cpp
     inc/glua/StringUtil.h src/StringUtil.cpp
 )

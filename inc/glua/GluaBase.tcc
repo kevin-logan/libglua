@@ -77,11 +77,17 @@ auto GluaBase::SafeGetChild(int parent_index, size_t child_index) -> Type
 {
     auto result_index = SafePushChild(parent_index, child_index);
 
-    auto retval = Get<Type>(result_index);
+    if (Is<Type>(result_index))
+    {
+        auto retval = As<Type>(result_index);
+
+        popOffStack(1);
+
+        return retval;
+    }
 
     popOffStack(1);
-
-    return retval;
+    throw std::runtime_error("Child of invalid type at index: " + std::to_string(child_index));
 }
 
 template<typename Type>
@@ -89,11 +95,17 @@ auto GluaBase::SafeGetChild(int parent_index, const std::string& child_key) -> T
 {
     auto result_index = SafePushChild(parent_index, child_key);
 
-    auto retval = Get<Type>(result_index);
+    if (Is<Type>(result_index))
+    {
+        auto retval = As<Type>(result_index);
+
+        popOffStack(1);
+
+        return retval;
+    }
 
     popOffStack(1);
-
-    return retval;
+    throw std::runtime_error("Child of invalid type with key: " + child_key);
 }
 
 template<typename Type>
@@ -342,12 +354,30 @@ auto GluaBase::RegisterMethod(const std::string& method_name, Callable method) -
 }
 
 template<typename... Params>
-auto GluaBase::CallScriptFunction(const std::string& function_name, Params&&... params) -> void
+auto GluaBase::CallScriptFunction(const std::string& function_name, Params&&... params) -> std::vector<StackPosition>
 {
+    auto previous_top = getStackTop();
+
     // push all params onto the stack
     ((Push(std::forward<Params>(params))), ...);
 
     callScriptFunctionImpl(function_name, sizeof...(params));
+
+    auto new_top = getStackTop();
+
+    std::vector<StackPosition> results;
+
+    if (new_top > previous_top)
+    {
+        results.reserve(new_top - previous_top);
+
+        for (auto return_index = previous_top + 1; return_index <= new_top; ++return_index)
+        {
+            results.emplace_back(this, return_index);
+        }
+    }
+
+    return results;
 }
 
 template<typename Type>
