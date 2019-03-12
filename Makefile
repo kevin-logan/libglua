@@ -4,7 +4,7 @@ CXX=clang++
 debug:
 	mkdir -p build_debug && \
 	cd build_debug && \
-	cmake -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) -DCMAKE_BUILD_TYPE="Debug" .. && \
+	cmake -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) -DCMAKE_BUILD_TYPE="Debug" -DCMAKE_CXX_FLAGS="-D_GLIBCXX_DEBUG" .. && \
 	cmake --build . && \
 	cp libglua-examples ../ && \
 	cd ..

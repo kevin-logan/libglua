@@ -2,11 +2,11 @@ cmake_minimum_required (VERSION 2.6)
 project (glua)
 
 set(LUA_INCLUDE_PATH "/usr/include/luajit-2.1" CACHE PATH "User specified lua include path.")
-set(LIBLUA "/lib64/luajit-5.1.so" CACHE FILEPATH "User specified lua library location.")
+set(LIBLUA "/lib64/libluajit-5.1.so" CACHE FILEPATH "User specified lua library location.")
 
 find_program(CLANG_TIDY_BIN NAMES "clang-tidy" DOC "clang-tidy binary location")
 if(CLANG_TIDY_BIN)
-    set(CLANG_TIDY_COMMAND "${CLANG_TIDY_BIN}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator,-fuchsia-trailing-return,-fuchsia-default-arguments,-google-readability-namespace-comments,-llvm-namespace-comment,-hicpp-no-array-decay,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,-google-default-arguments,-llvm-header-guard,-google-runtime-references,-misc-macro-parentheses,-bugprone-macro-parentheses,-bugprone-unused-return-value" "-header-filter=.*")
+    set(CLANG_TIDY_COMMAND "${CLANG_TIDY_BIN}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator,-fuchsia-trailing-return,-fuchsia-default-arguments,-readability-else-after-return,-google-readability-namespace-comments,-llvm-namespace-comment,-hicpp-no-array-decay,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,-google-default-arguments,-llvm-header-guard,-google-runtime-references,-misc-macro-parentheses,-bugprone-macro-parentheses,-bugprone-unused-return-value" "-header-filter=.*")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -26,7 +26,8 @@ set(SOURCE_FILES
 
 add_library(glua ${SOURCE_FILES})
 
-target_include_directories(glua SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/inc" ${LUA_INCLUDE_PATH})
+target_include_directories(glua SYSTEM PRIVATE ${LUA_INCLUDE_PATH})
+target_include_directories(glua PRIVATE "${PROJECT_SOURCE_DIR}/inc")
 target_compile_features(glua PRIVATE cxx_std_17)
 
 if(CLANG_TIDY_BIN)
@@ -39,7 +40,8 @@ project (libglua-examples)
 add_executable(libglua-examples
     src/examples/examples.cpp
 )
-target_include_directories(libglua-examples SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/inc" ${LUA_INCLUDE_PATH})
 
+target_include_directories(libglua-examples SYSTEM PRIVATE ${LUA_INCLUDE_PATH})
+target_include_directories(libglua-examples PRIVATE "${PROJECT_SOURCE_DIR}/inc")
 target_link_libraries(libglua-examples PRIVATE m dl glua ${LIBLUA})
 target_compile_features(libglua-examples PRIVATE cxx_std_17)

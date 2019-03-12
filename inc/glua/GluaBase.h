@@ -88,12 +88,6 @@ public:
   virtual auto RegisterCallable(const std::string &name, Callable callable)
       -> void = 0;
   /**
-   * @brief Runs a script, executing the global code
-   *
-   * @param script_data the script code
-   */
-  virtual auto RunScript(std::string_view script_data) -> void = 0;
-  /**
    * @brief Runs a file, by reading the data in from the file and calling
    * RunScript
    *
@@ -271,6 +265,27 @@ public:
   template <typename T> auto Pop() -> T;
 
   /**
+   * @param stack_index the index of the value to check
+   *
+   * @returns true if the value at the given index is an array
+   */
+  auto IsArray(int stack_index) -> bool;
+
+  /**
+   * @param stack_index the index of the value to check
+   *
+   * @returns true if the value at the given index is a map
+   */
+  auto IsMap(int stack_index) -> bool;
+
+  /**
+   * @param stack_index the index of the value to check
+   *
+   * @returnsthe number of children the array at the given index has
+   */
+  auto GetArrayLength(int stack_index) -> size_t;
+
+  /**
    * @brief Sets a global value with the given name to the given value
    *
    * @tparam T the type of value to set the global to
@@ -301,60 +316,17 @@ public:
   auto PushGlobal(const std::string &name) -> StackPosition;
 
   /**
-   * @brief Creates a callable object as a GluaCallable from the given functor,
-   * so it is capable of retrieving arguments from the Glua stack, and putting
-   * return values back on the glua stack
+   * @brief Creates a callable object as a GluaCallable from the given functor
+   * (which can be a function pointer, method pointer, lambda, or any other
+   * kind of functor), so it is capable of retrieving arguments from the Glua
+   * stack, and putting return values back on the glua stack
    *
    * @tparam Functor the type of the actual functor for the callable
    * @tparam Params the parameters the functor receives when called
    * @param f the actual functor for the callable
    * @return Callable a wrapped GluaCallable as a Callable
    */
-  template <typename Functor, typename... Params>
-  auto CreateGluaCallable(Functor &&f) -> Callable;
-
-  /**
-   * @brief Creates a callable object as a GluaCallable from the given function
-   * pointer, so it is capable of retrieving arguments from the Glua stack, and
-   * putting return values back on the glua stack
-   *
-   * @tparam ReturnType the return type of the function pointer
-   * @tparam Params thet parameter types of the function pointer
-   * @param callable the actual function pointer for the callable
-   * @return Callable a wrapped GluaCallable as a Callable
-   */
-  template <typename ReturnType, typename... Params>
-  auto CreateGluaCallable(ReturnType (*callable)(Params...)) -> Callable;
-
-  /**
-   * @brief Creates a callable object as a GluaCallable from the given const
-   * method pointer, so it is capable of retrieving arguments from the Glua
-   * stack, and putting return values back on the glua stack
-   *
-   * @tparam ClassType the type of the Class this is a method of
-   * @tparam ReturnType the return type of the method
-   * @tparam Params the method parameter types
-   * @param callable the actual method pointer for the callable
-   * @return Callable a wrapped GluaCallable as a Callable
-   */
-  template <typename ClassType, typename ReturnType, typename... Params>
-  auto CreateGluaCallable(ReturnType (ClassType::*callable)(Params...) const)
-      -> Callable;
-
-  /**
-   * @brief Creates a callable object as a GluaCallable from the given method
-   * pointer, so it is capable of retrieving arguments from the Glua stack, and
-   * putting return values back on the glua stack
-   *
-   * @tparam ClassType the type of the Class this is a method of
-   * @tparam ReturnType the return type of the method
-   * @tparam Params the method parameter types
-   * @param callable the actual method pointer for the callable
-   * @return Callable a wrapped GluaCallable as a Callable
-   */
-  template <typename ClassType, typename ReturnType, typename... Params>
-  auto CreateGluaCallable(ReturnType (ClassType::*callable)(Params...))
-      -> Callable;
+  template <typename Functor> auto CreateGluaCallable(Functor &&f) -> Callable;
 
   /**
    * @brief Registers a class from a multi string. This string is generally
@@ -400,6 +372,16 @@ public:
    */
   template <typename ClassType>
   auto RegisterMethod(const std::string &method_name, Callable method) -> void;
+
+  /**
+   * @brief Runs a script, executing the global code
+   *
+   * @param script_data the script code
+   *
+   * @return a vector of the stack positions of all return arguments from
+   * executing the script
+   */
+  auto RunScript(std::string_view script_data) -> std::vector<StackPosition>;
 
   /**
    * @brief Calls a function in the scripting environment with the given name
@@ -504,29 +486,34 @@ protected:
                                   Callable method) -> void = 0;
   virtual auto transformObjectIndex(size_t index) -> size_t = 0;
   virtual auto transformFunctionParameterIndex(size_t index) -> size_t = 0;
+  virtual auto runScript(std::string_view script_data) -> void = 0;
   /********************************************************************************/
 
 private:
-  template <typename Type> auto push(const std::vector<Type> &value) -> void;
-  template <typename Type>
-  auto push(const std::unordered_map<std::string, Type> &value) -> void;
-
-  template <typename Type> auto pushRegisteredType(Type &&custom_type) -> void;
-
-  template <typename Type> auto getArray(int stack_index) -> std::vector<Type>;
-  template <typename Type>
-  auto getStringMap(int stack_index) -> std::unordered_map<std::string, Type>;
-  template <typename Type>
-  auto getOptional(int stack_index) -> std::optional<Type>;
-
-  template <typename Type> auto getRegisteredType(int index) -> Type;
-  template <typename Type> auto isRegisteredType(int index) -> bool;
-
   template <typename T>
   auto getUniqueClassName() const
       -> std::optional<std::reference_wrapper<const std::string>>;
   template <typename T>
   auto setUniqueClassName(std::string metatable_name) -> void;
+
+  template <typename Functor>
+  auto createGluaCallableImpl(Functor f) -> Callable;
+  template <typename Functor, typename ReturnType, typename... Params>
+  auto createGluaCallableImpl(
+      Functor f, ReturnType (Functor::*reference_call_operator)(Params...))
+      -> Callable;
+  template <typename Functor, typename ReturnType, typename... Params>
+  auto createGluaCallableImpl(
+      Functor f, ReturnType (Functor::*reference_call_operator)(Params...)
+                     const) -> Callable;
+  template <typename ReturnType, typename... Params>
+  auto createGluaCallableImpl(ReturnType (*callable)(Params...)) -> Callable;
+  template <typename ClassType, typename ReturnType, typename... Params>
+  auto createGluaCallableImpl(ReturnType (ClassType::*callable)(Params...)
+                                  const) -> Callable;
+  template <typename ClassType, typename ReturnType, typename... Params>
+  auto createGluaCallableImpl(ReturnType (ClassType::*callable)(Params...))
+      -> Callable;
 
   std::unordered_map<std::type_index, std::string> m_class_to_metatable_name;
 

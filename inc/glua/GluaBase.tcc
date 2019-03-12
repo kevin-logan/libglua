@@ -18,28 +18,11 @@ auto GluaBase::deferred_argument_push(const ICallable *callable, Type &&value)
 /*************************************************************/
 
 template <typename Type> auto GluaBase::Push(Type &&value) -> int {
-  GluaResolver<Type>::push(this, std::forward<Type>(value));
-
-  /*
-  // first check for custom pusher of actual type, not base type
-  if constexpr (HasCustomPusher<Type>::value) {
-    glua_push(this, std::forward<Type>(value));
-  } else if constexpr (IsReferenceWrapper<Type>::value &&
-                       HasCustomPusher<typename RegistryType<
-                           Type>::underlying_type>::value) {
-    // reference_wrapper to custom type, just push it's value
-    glua_push(this, value.get());
-  } else if constexpr (GluaBaseCanPush<Type>::value) {
-    push(std::forward<Type>(value));
-  } else if constexpr (IsReferenceWrapper<Type>::value &&
-                       GluaBaseCanPush<typename RegistryType<
-                           Type>::underlying_type>::value) {
-    // reference_wrapper to supported type, just push it's value
-    push(value.get());
-  } else {
-    // some kind of complex type
-    pushRegisteredType(std::forward<Type>(value));
-  }*/
+  // can't push by anything other than value, so decay
+  // If user wants to push a reference (which they must guarantee the
+  // lifetime of) they can use std::reference_wrapper which would then
+  // be passed by value
+  GluaResolver<std::decay_t<Type>>::push(this, std::forward<Type>(value));
 
   return getStackTop();
 }
@@ -102,39 +85,10 @@ auto GluaBase::SafeGetChild(int parent_index, const std::string &child_key)
 
 template <typename Type> auto GluaBase::Is(int stack_index) -> bool {
   return GluaResolver<Type>::is(this, stack_index);
-  /*if constexpr (HasCustomGetter<Type>::value) {
-    std::optional<Type> result;
-    glua_get(this, stack_index, result);
-
-    return result.has_value();
-  }
-
-  if constexpr (GluaCanResolve<Type>::value) {
-    return GluaResolver<Type>::is(this, stack_index);
-  }
-
-  return isRegisteredType<Type>(stack_index);*/
 }
 
 template <typename Type> auto GluaBase::As(int stack_index) -> Type {
   return GluaResolver<Type>::as(this, stack_index);
-  /*if constexpr (HasCustomGetter<Type>::value) {
-    std::optional<Type> result;
-    glua_get(this, stack_index, result);
-
-    if (!result.has_value()) {
-      throw exceptions::GluaBaseException(
-          "Custom glua_get did not populate optional");
-    }
-
-    return std::move(result.value());
-  }
-
-  if constexpr (GluaCanResolve<Type>::value) {
-    return GluaResolver<Type>::get(this, stack_index);
-  }
-
-  return getRegisteredType<Type>(stack_index);*/
 }
 
 template <typename Type> auto GluaBase::Get(int stack_index) -> Type {
@@ -171,43 +125,9 @@ auto GluaBase::SetGlobal(const std::string &name, T value) -> void {
   popOffStack(1); // pop off the value we pushed
 }
 
-template <typename Functor, typename... Params>
+template <typename Functor>
 auto GluaBase::CreateGluaCallable(Functor &&f) -> Callable {
-  return Callable{std::make_unique<GluaCallable<Functor, Params...>>(
-      this, std::forward<Functor>(f))};
-}
-
-template <typename ReturnType, typename... Params>
-auto GluaBase::CreateGluaCallable(ReturnType (*callable)(Params...))
-    -> Callable {
-  return Callable{std::make_unique<GluaCallable<decltype(callable), Params...>>(
-      this, callable)};
-}
-
-template <typename ClassType, typename ReturnType, typename... Params>
-auto GluaBase::CreateGluaCallable(ReturnType (ClassType::*callable)(Params...)
-                                      const) -> Callable {
-  auto method_call_lambda = [callable](const ClassType &object,
-                                       Params... params) -> ReturnType {
-    return (object.*callable)(std::forward<Params>(params)...);
-  };
-
-  return Callable{std::make_unique<
-      GluaCallable<decltype(method_call_lambda), const ClassType &, Params...>>(
-      this, std::move(method_call_lambda))};
-}
-
-template <typename ClassType, typename ReturnType, typename... Params>
-auto GluaBase::CreateGluaCallable(ReturnType (ClassType::*callable)(Params...))
-    -> Callable {
-  auto method_call_lambda = [callable](ClassType &object,
-                                       Params... params) -> ReturnType {
-    return (object.*callable)(std::forward<Params>(params)...);
-  };
-
-  return Callable{std::make_unique<
-      GluaCallable<decltype(method_call_lambda), ClassType &, Params...>>(
-      this, std::move(method_call_lambda))};
+  return createGluaCallableImpl(std::forward<Functor>(f));
 }
 
 template <typename Method, typename... Methods>
@@ -345,217 +265,6 @@ auto GluaBase::CallScriptFunction(const std::string &function_name,
   return results;
 }
 
-template <typename Type>
-auto GluaBase::push(const std::vector<Type> &value) -> void {
-  auto size = value.size();
-  pushArray(size);
-
-  for (size_t i = 0; i < size; ++i) {
-    Push(transformObjectIndex(i));
-    Push(value[i]);
-    arraySetFromStack();
-  }
-}
-template <typename Type>
-auto GluaBase::push(const std::unordered_map<std::string, Type> &value)
-    -> void {
-  pushMap(value.size());
-
-  for (const auto &item_pair : value) {
-    Push(item_pair.first);
-    Push(item_pair.second);
-    mapSetFromStack();
-  }
-}
-
-template <typename Type>
-auto GluaBase::pushRegisteredType(Type &&custom_type) -> void {
-  if constexpr (std::is_enum<std::remove_reference_t<
-                    std::remove_const_t<Type>>>::value) {
-    Push(static_cast<uint64_t>(custom_type));
-  } else {
-    using UnderlyingType = typename RegistryType<Type>::underlying_type;
-
-    auto unique_name_opt = getUniqueClassName<
-        std::remove_reference_t<std::remove_const_t<UnderlyingType>>>();
-
-    if (unique_name_opt.has_value()) {
-      // create storage, hand off to implementation
-      if constexpr (std::is_pointer<Type>::value) {
-        pushUserType(unique_name_opt.value(),
-                     std::make_unique<ManagedTypeRawPtr<UnderlyingType>>(
-                         std::forward<Type>(custom_type)));
-      } else if constexpr (IsReferenceWrapper<Type>::value) {
-        pushUserType(unique_name_opt.value(),
-                     std::make_unique<ManagedTypeRawPtr<UnderlyingType>>(
-                         static_cast<UnderlyingType *>(&custom_type.get())));
-      } else if constexpr (IsSharedPointer<Type>::value) {
-        pushUserType(unique_name_opt.value(),
-                     std::make_unique<ManagedTypeSharedPtr<UnderlyingType>>(
-                         std::forward<Type>(custom_type)));
-      } else {
-        // by value
-        pushUserType(
-            unique_name_opt.value(),
-            std::make_unique<
-                ManagedTypeStackAllocated<std::remove_reference_t<Type>>>(
-                std::forward<Type>(custom_type)));
-      }
-    } else {
-      throw exceptions::GluaBaseException(
-          "Attempted to push unregistered type");
-    }
-  }
-}
-
-template <typename Type>
-auto GluaBase::getArray(int stack_index) -> std::vector<Type> {
-  auto count = getArraySize(stack_index);
-
-  std::vector<Type> result;
-  result.reserve(count);
-
-  for (size_t i = 0; i < count; ++i) {
-    // pushes array value onto stack
-    getArrayValue(transformObjectIndex(i), stack_index);
-    result.push_back(Get<Type>(-1)); // top of stack is now our value
-    // pop the value back off thestack
-    popOffStack(1);
-  }
-
-  return result;
-}
-template <typename Type>
-auto GluaBase::getStringMap(int stack_index)
-    -> std::unordered_map<std::string, Type> {
-  auto map_keys = getMapKeys(stack_index);
-
-  std::unordered_map<std::string, Type> result;
-  result.reserve(map_keys.size());
-
-  for (auto &map_key : map_keys) {
-    getMapValue(map_key, stack_index);
-    result[std::move(map_key)] =
-        Get<Type>(-1); // after GetMapValue top of stack should be value
-    // pop map value off stack
-    popOffStack(1);
-  }
-
-  return result;
-}
-template <typename Type>
-auto GluaBase::getOptional(int stack_index) -> std::optional<Type> {
-  if (isNull(stack_index)) {
-    return std::nullopt;
-  }
-
-  return Get<Type>(stack_index);
-}
-
-template <typename Type> auto GluaBase::getRegisteredType(int index) -> Type {
-  if constexpr (std::is_enum<std::remove_reference_t<
-                    std::remove_const_t<Type>>>::value) {
-    return static_cast<Type>(Get<uint64_t>(index));
-  }
-
-  using UnderlyingType = typename RegistryType<Type>::underlying_type;
-
-  auto unique_name_opt = getUniqueClassName<
-      std::remove_reference_t<std::remove_const_t<UnderlyingType>>>();
-
-  if (unique_name_opt.has_value()) {
-    auto storage_ptr = getUserType(unique_name_opt.value(), index);
-
-    if (storage_ptr) {
-      if constexpr (std::is_pointer<Type>::value) {
-        switch (storage_ptr->GetStorageType()) {
-        case ManagedTypeStorage::RAW_PTR:
-          return static_cast<ManagedTypeRawPtr<UnderlyingType> *>(storage_ptr)
-              ->GetValue();
-        case ManagedTypeStorage::SHARED_PTR:
-          return static_cast<ManagedTypeSharedPtr<UnderlyingType> *>(
-                     storage_ptr)
-              ->GetValue()
-              .get();
-        case ManagedTypeStorage::STACK_ALLOCATED:
-          return &static_cast<ManagedTypeStackAllocated<UnderlyingType> *>(
-                      storage_ptr)
-                      ->GetValue();
-        }
-      } else if constexpr (IsReferenceWrapper<Type>::value) {
-        switch (storage_ptr->GetStorageType()) {
-        case ManagedTypeStorage::RAW_PTR:
-          return std::ref(
-              *static_cast<ManagedTypeRawPtr<UnderlyingType> *>(storage_ptr)
-                   ->GetValue());
-        case ManagedTypeStorage::SHARED_PTR:
-          return std::ref(
-              *static_cast<ManagedTypeSharedPtr<UnderlyingType> *>(storage_ptr)
-                   ->GetValue());
-        case ManagedTypeStorage::STACK_ALLOCATED:
-          return std::ref(
-              static_cast<ManagedTypeStackAllocated<UnderlyingType> *>(
-                  storage_ptr)
-                  ->GetValue());
-        }
-      } else if constexpr (IsSharedPointer<Type>::value) {
-        if (storage_ptr->GetStorageType() == ManagedTypeStorage::SHARED_PTR) {
-          return static_cast<ManagedTypeSharedPtr<UnderlyingType> *>(
-                     storage_ptr)
-              ->GetValue();
-        }
-
-        throw exceptions::GluaBaseException(
-            ("Failed to get registered type as shared_ptr because it was not "
-             "storaged as shared_ptr [" +
-             unique_name_opt.value().get())
-                .append("]"));
-      } else {
-        // by value
-        switch (storage_ptr->GetStorageType()) {
-        case ManagedTypeStorage::RAW_PTR:
-          return *static_cast<ManagedTypeRawPtr<UnderlyingType> *>(storage_ptr)
-                      ->GetValue();
-        case ManagedTypeStorage::SHARED_PTR:
-          return *static_cast<ManagedTypeSharedPtr<UnderlyingType> *>(
-                      storage_ptr)
-                      ->GetValue();
-        case ManagedTypeStorage::STACK_ALLOCATED:
-          return static_cast<ManagedTypeStackAllocated<UnderlyingType> *>(
-                     storage_ptr)
-              ->GetValue();
-        }
-      }
-    } else {
-      throw exceptions::GluaBaseException(
-          ("Failed to get registered type [" + unique_name_opt.value().get())
-              .append("]"));
-    }
-  } else {
-    throw exceptions::GluaBaseException(
-        "Attempted to get registered type without valid class name");
-  }
-}
-
-template <typename Type> auto GluaBase::isRegisteredType(int index) -> bool {
-  if constexpr (std::is_enum<std::remove_reference_t<
-                    std::remove_const_t<Type>>>::value) {
-    return isUInt64(index);
-  }
-
-  using UnderlyingType = typename RegistryType<Type>::underlying_type;
-
-  auto unique_name_opt = getUniqueClassName<
-      std::remove_reference_t<std::remove_const_t<UnderlyingType>>>();
-
-  if (unique_name_opt.has_value()) {
-    return isUserType(unique_name_opt.value(), index);
-  }
-
-  throw exceptions::GluaBaseException(
-      "Attempted to check against a registered type without valid class name");
-}
-
 template <typename T>
 auto GluaBase::getUniqueClassName() const
     -> std::optional<std::reference_wrapper<const std::string>> {
@@ -575,6 +284,69 @@ auto GluaBase::setUniqueClassName(std::string metatable_name) -> void {
   auto index = std::type_index{typeid(T)};
 
   m_class_to_metatable_name[index] = std::move(metatable_name);
+}
+
+template <typename Functor>
+auto GluaBase::createGluaCallableImpl(Functor f) -> Callable {
+  // must deduce parameters to this functor, get the call operator
+  auto operator_ptr = &Functor::operator();
+
+  return createGluaCallableImpl(std::move(f), operator_ptr);
+}
+
+template <typename Functor, typename ReturnType, typename... Params>
+auto GluaBase::createGluaCallableImpl(
+    Functor f, ReturnType (Functor::*reference_call_operator)(Params...))
+    -> Callable {
+  // we only needed this to deduce Params, but having a name is nice
+  (void)reference_call_operator;
+
+  return Callable{
+      std::make_unique<GluaCallable<Functor, Params...>>(this, std::move(f))};
+}
+
+template <typename Functor, typename ReturnType, typename... Params>
+auto GluaBase::createGluaCallableImpl(
+    Functor f, ReturnType (Functor::*reference_call_operator)(Params...) const)
+    -> Callable {
+  // we only needed this to deduce Params, but having a name is nice
+  (void)reference_call_operator;
+
+  return Callable{
+      std::make_unique<GluaCallable<Functor, Params...>>(this, std::move(f))};
+}
+
+template <typename ReturnType, typename... Params>
+auto GluaBase::createGluaCallableImpl(ReturnType (*callable)(Params...))
+    -> Callable {
+  return Callable{std::make_unique<GluaCallable<decltype(callable), Params...>>(
+      this, callable)};
+}
+
+template <typename ClassType, typename ReturnType, typename... Params>
+auto GluaBase::createGluaCallableImpl(
+    ReturnType (ClassType::*callable)(Params...) const) -> Callable {
+  auto method_call_lambda = [callable](const ClassType &object,
+                                       Params... params) -> ReturnType {
+    return (object.*callable)(std::forward<Params>(params)...);
+  };
+
+  return Callable{std::make_unique<
+      GluaCallable<decltype(method_call_lambda), const ClassType &, Params...>>(
+      this, std::move(method_call_lambda))};
+}
+
+template <typename ClassType, typename ReturnType, typename... Params>
+auto GluaBase::createGluaCallableImpl(
+    ReturnType (ClassType::*callable)(Params...)) -> Callable {
+  auto method_call_lambda = [callable](ClassType &object,
+                                       Params... params) -> ReturnType {
+    return (object.*callable)(std::forward<Params>(params)...);
+  };
+
+  return Callable{std::make_unique<
+      GluaCallable<decltype(method_call_lambda), ClassType &, Params...>>(
+      this, std::move(method_call_lambda))};
 }
 
 } // namespace kdk::glua
