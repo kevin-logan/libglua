@@ -87,13 +87,6 @@ public:
    */
   virtual auto RegisterCallable(const std::string &name, Callable callable)
       -> void = 0;
-  /**
-   * @brief Runs a file, by reading the data in from the file and calling
-   * RunScript
-   *
-   * @param file_name the file to run
-   */
-  virtual auto RunFile(std::string_view file_name) -> void = 0;
   /*****************************************************************************/
 
   /**
@@ -372,6 +365,17 @@ public:
    */
   template <typename ClassType>
   auto RegisterMethod(const std::string &method_name, Callable method) -> void;
+
+  /**
+   * @brief Runs a file, by reading the data in from the file and calling
+   * RunScript
+   *
+   * @param file_name the file to run
+   *
+   * @return a vector of the stack positions of all return arguments from
+   * executing the file
+   */
+  auto RunFile(std::string_view file_name) -> std::vector<StackPosition>;
 
   /**
    * @brief Runs a script, executing the global code

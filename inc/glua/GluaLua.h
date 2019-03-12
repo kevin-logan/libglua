@@ -52,10 +52,6 @@ public:
    */
   auto RegisterCallable(const std::string &name, Callable callable)
       -> void override;
-  /**
-   * @copydoc GluaBase::RunFile(std::string_view)
-   */
-  auto RunFile(std::string_view file_name) -> void override;
   /*****************************************************************************/
 
   /**

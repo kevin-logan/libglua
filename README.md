@@ -19,6 +19,8 @@ auto script = kdk::file_util::read_all("example.lua");
 glua.RunScript(script);
 ```
 
+Note: top-level scripts can return values, and a vector of StackPosition objects will be returned by `RunFile` and `RunScript`. This behaves just like `GluaBase::CallScriptFunction` which is explained later.
+
 ### Using a C++ function in Lua
 In your C++ code you could have a function like this:
 ```C++

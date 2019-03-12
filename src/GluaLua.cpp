@@ -173,11 +173,6 @@ auto GluaLua::RegisterCallable(const std::string &name, Callable callable)
         "Registered a callable with an already used name");
   }
 }
-auto GluaLua::RunFile(std::string_view file_name) -> void {
-  auto file_str = file_util::read_all(file_name);
-
-  RunScript(file_str);
-}
 auto GluaLua::push(std::nullopt_t /*unused*/) -> void {
   lua_pushnil(m_lua.get());
 }

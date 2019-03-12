@@ -1,5 +1,7 @@
 #include "glua/GluaBase.h"
 
+#include "glua/FileUtil.h"
+
 namespace kdk::glua {
 auto GluaBase::PushChild(int parent_index, size_t child_index)
     -> StackPosition {
@@ -53,6 +55,13 @@ auto GluaBase::PushGlobal(const std::string &name) -> StackPosition {
   pushGlobal(name);
 
   return StackPosition{this, getStackTop()};
+}
+
+auto GluaBase::RunFile(std::string_view file_name)
+    -> std::vector<StackPosition> {
+  auto file_str = file_util::read_all(file_name);
+
+  return RunScript(file_str);
 }
 
 auto GluaBase::RunScript(std::string_view script_data)
