@@ -3,6 +3,7 @@
 libglua-examples
 build_debug
 build_release
+CMakeLists.txt.user
 
 # Prerequisites
 *.d
