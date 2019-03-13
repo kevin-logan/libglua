@@ -168,7 +168,7 @@ auto GluaBase::RegisterClassMultiString(std::string_view method_names,
     // split method names (as parameters) into vector, trim whitespace
     auto comma_separated = string_util::remove_all_whitespace(method_names);
 
-    auto method_names_vector = string_util::split(comma_separated, std::string_view { "," });
+    auto method_names_vector = string_util::split(comma_separated, std::string_view{ "," });
 
     std::vector<std::unique_ptr<ICallable>> methods_vector;
     methods_vector.reserve(sizeof...(Methods));
@@ -178,7 +178,7 @@ auto GluaBase::RegisterClassMultiString(std::string_view method_names,
 }
 
 template <typename T>
-auto default_construct_type() -> T { return T {}; }
+auto default_construct_type() -> T { return T{}; }
 
 template <typename ClassType>
 auto GluaBase::RegisterClass(std::vector<std::string_view> method_names,
@@ -206,12 +206,12 @@ auto GluaBase::RegisterClass(std::vector<std::string_view> method_names,
                 }
 
                 if (class_name.empty()) {
-                    class_name = std::string { method_class };
+                    class_name = std::string{ method_class };
                 }
 
                 if (class_name == method_class) {
                     // add method to metatable
-                    method_callables.emplace(std::string { method_name }, std::move(method));
+                    method_callables.emplace(std::string{ method_name }, std::move(method));
                 } else {
                     throw std::logic_error(
                         "RegisterClass had methods from various classes, only one class "
@@ -293,7 +293,7 @@ template <typename T>
 auto GluaBase::getUniqueClassName() const
     -> std::optional<std::reference_wrapper<const std::string>>
 {
-    auto index = std::type_index { typeid(T) };
+    auto index = std::type_index{ typeid(T) };
 
     auto pos = m_class_to_metatable_name.find(index);
 
@@ -307,7 +307,7 @@ auto GluaBase::getUniqueClassName() const
 template <typename T>
 auto GluaBase::setUniqueClassName(std::string metatable_name) -> void
 {
-    auto index = std::type_index { typeid(T) };
+    auto index = std::type_index{ typeid(T) };
 
     m_class_to_metatable_name[index] = std::move(metatable_name);
 }
@@ -329,7 +329,7 @@ auto GluaBase::createGluaCallableImpl(
     // we only needed this to deduce Params, but having a name is nice
     (void)reference_call_operator;
 
-    return Callable {
+    return Callable{
         std::make_unique<GluaCallable<Functor, Params...>>(this, std::move(f))
     };
 }
@@ -342,7 +342,7 @@ auto GluaBase::createGluaCallableImpl(
     // we only needed this to deduce Params, but having a name is nice
     (void)reference_call_operator;
 
-    return Callable {
+    return Callable{
         std::make_unique<GluaCallable<Functor, Params...>>(this, std::move(f))
     };
 }
@@ -351,7 +351,7 @@ template <typename ReturnType, typename... Params>
 auto GluaBase::createGluaCallableImpl(ReturnType (*callable)(Params...))
     -> Callable
 {
-    return Callable { std::make_unique<GluaCallable<decltype(callable), Params...>>(
+    return Callable{ std::make_unique<GluaCallable<decltype(callable), Params...>>(
         this, callable) };
 }
 
@@ -364,7 +364,7 @@ auto GluaBase::createGluaCallableImpl(
         return (object.*callable)(std::forward<Params>(params)...);
     };
 
-    return Callable { std::make_unique<
+    return Callable{ std::make_unique<
         GluaCallable<decltype(method_call_lambda), const ClassType&, Params...>>(
         this, std::move(method_call_lambda)) };
 }
@@ -378,7 +378,7 @@ auto GluaBase::createGluaCallableImpl(
         return (object.*callable)(std::forward<Params>(params)...);
     };
 
-    return Callable { std::make_unique<
+    return Callable{ std::make_unique<
         GluaCallable<decltype(method_call_lambda), ClassType&, Params...>>(
         this, std::move(method_call_lambda)) };
 }

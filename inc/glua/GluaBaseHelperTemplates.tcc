@@ -40,16 +40,16 @@ auto GluaResolver<T>::is(GluaBase* glua, int stack_index) -> bool
 
     if constexpr (std::is_enum<RawT>::value) {
         return GluaResolver<uint64_t>::is(glua, stack_index);
+    } else {
+        auto unique_name_opt = glua->getUniqueClassName<RawT>();
+
+        if (unique_name_opt.has_value()) {
+            return glua->isUserType(unique_name_opt.value(), stack_index);
+        }
+
+        throw exceptions::GluaBaseException(
+            "Attempted to check against a registered type without valid class name");
     }
-
-    auto unique_name_opt = glua->getUniqueClassName<RawT>();
-
-    if (unique_name_opt.has_value()) {
-        return glua->isUserType(unique_name_opt.value(), stack_index);
-    }
-
-    throw exceptions::GluaBaseException(
-        "Attempted to check against a registered type without valid class name");
 }
 
 template <typename T>
@@ -81,27 +81,27 @@ auto GluaResolver<T*>::as(GluaBase* glua, int stack_index) -> T*
 
     if constexpr (std::is_enum<RawT>::value) {
         return static_cast<T>(GluaResolver<uint64_t>::as(glua, stack_index));
-    }
+    } else {
+        auto unique_name_opt = glua->getUniqueClassName<RawT>();
 
-    auto unique_name_opt = glua->getUniqueClassName<RawT>();
+        if (unique_name_opt.has_value()) {
+            auto storage_ptr = static_cast<ManagedTypeStorage<RawT>*>(
+                glua->getUserType(unique_name_opt.value(), stack_index));
 
-    if (unique_name_opt.has_value()) {
-        auto storage_ptr = static_cast<ManagedTypeStorage<RawT>*>(
-            glua->getUserType(unique_name_opt.value(), stack_index));
+            if (storage_ptr) {
+                return &storage_ptr->GetStoredValue();
+            }
 
-        if (storage_ptr) {
-            return &storage_ptr->GetStoredValue();
+            // all above cases return, so type must be unregistered
+            throw exceptions::GluaBaseException(
+                ("Failed to get registered type [" + unique_name_opt.value().get())
+                    .append("]"));
         }
 
-        // all above cases return, so type must be unregistered
+        // if we got here we have an invalid class name
         throw exceptions::GluaBaseException(
-            ("Failed to get registered type [" + unique_name_opt.value().get())
-                .append("]"));
+            "Attempted to get registered type without valid class name");
     }
-
-    // if we got here we have an invalid class name
-    throw exceptions::GluaBaseException(
-        "Attempted to get registered type without valid class name");
 }
 template <typename T>
 auto GluaResolver<T*>::is(GluaBase* glua, int stack_index) -> bool
@@ -110,16 +110,16 @@ auto GluaResolver<T*>::is(GluaBase* glua, int stack_index) -> bool
 
     if constexpr (std::is_enum<RawT>::value) {
         return GluaResolver<uint64_t>::is(glua, stack_index);
+    } else {
+        auto unique_name_opt = glua->getUniqueClassName<RawT>();
+
+        if (unique_name_opt.has_value()) {
+            return glua->isUserType(unique_name_opt.value(), stack_index);
+        }
+
+        throw exceptions::GluaBaseException(
+            "Attempted to check against a registered type without valid class name");
     }
-
-    auto unique_name_opt = glua->getUniqueClassName<RawT>();
-
-    if (unique_name_opt.has_value()) {
-        return glua->isUserType(unique_name_opt.value(), stack_index);
-    }
-
-    throw exceptions::GluaBaseException(
-        "Attempted to check against a registered type without valid class name");
 }
 template <typename T>
 auto GluaResolver<T*>::push(GluaBase* glua, T* value) -> void
@@ -151,27 +151,27 @@ auto GluaResolver<std::reference_wrapper<T>>::as(GluaBase* glua,
 
     if constexpr (std::is_enum<RawT>::value) {
         return static_cast<T>(GluaResolver<uint64_t>::as(glua, stack_index));
-    }
+    } else {
+        auto unique_name_opt = glua->getUniqueClassName<RawT>();
 
-    auto unique_name_opt = glua->getUniqueClassName<RawT>();
+        if (unique_name_opt.has_value()) {
+            auto storage_ptr = static_cast<ManagedTypeStorage<RawT>*>(
+                glua->getUserType(unique_name_opt.value(), stack_index));
 
-    if (unique_name_opt.has_value()) {
-        auto storage_ptr = static_cast<ManagedTypeStorage<RawT>*>(
-            glua->getUserType(unique_name_opt.value(), stack_index));
+            if (storage_ptr) {
+                return std::ref(storage_ptr->GetStoredValue());
+            }
 
-        if (storage_ptr) {
-            return std::ref(storage_ptr->GetStoredValue());
+            // all above cases return, so type must be unregistered
+            throw exceptions::GluaBaseException(
+                ("Failed to get registered type [" + unique_name_opt.value().get())
+                    .append("]"));
         }
 
-        // all above cases return, so type must be unregistered
+        // if we got here we have an invalid class name
         throw exceptions::GluaBaseException(
-            ("Failed to get registered type [" + unique_name_opt.value().get())
-                .append("]"));
+            "Attempted to get registered type without valid class name");
     }
-
-    // if we got here we have an invalid class name
-    throw exceptions::GluaBaseException(
-        "Attempted to get registered type without valid class name");
 }
 template <typename T>
 auto GluaResolver<std::reference_wrapper<T>>::is(GluaBase* glua,
@@ -181,16 +181,16 @@ auto GluaResolver<std::reference_wrapper<T>>::is(GluaBase* glua,
 
     if constexpr (std::is_enum<RawT>::value) {
         return GluaResolver<uint64_t>::is(glua, stack_index);
+    } else {
+        auto unique_name_opt = glua->getUniqueClassName<RawT>();
+
+        if (unique_name_opt.has_value()) {
+            return glua->isUserType(unique_name_opt.value(), stack_index);
+        }
+
+        throw exceptions::GluaBaseException(
+            "Attempted to check against a registered type without valid class name");
     }
-
-    auto unique_name_opt = glua->getUniqueClassName<RawT>();
-
-    if (unique_name_opt.has_value()) {
-        return glua->isUserType(unique_name_opt.value(), stack_index);
-    }
-
-    throw exceptions::GluaBaseException(
-        "Attempted to check against a registered type without valid class name");
 }
 template <typename T>
 auto GluaResolver<std::reference_wrapper<T>>::push(
@@ -230,38 +230,38 @@ auto GluaResolver<std::shared_ptr<T>>::as(GluaBase* glua, int stack_index)
 
     if constexpr (std::is_enum<RawT>::value) {
         return static_cast<T>(GluaResolver<uint64_t>::as(glua, stack_index));
-    }
+    } else {
+        auto unique_name_opt = glua->getUniqueClassName<RawT>();
 
-    auto unique_name_opt = glua->getUniqueClassName<RawT>();
+        if (unique_name_opt.has_value()) {
+            auto storage_ptr = static_cast<ManagedTypeStorage<RawT>*>(
+                glua->getUserType(unique_name_opt.value(), stack_index));
 
-    if (unique_name_opt.has_value()) {
-        auto storage_ptr = static_cast<ManagedTypeStorage<RawT>*>(
-            glua->getUserType(unique_name_opt.value(), stack_index));
+            if (storage_ptr) {
+                // shared_ptr is a special case where it must specifically have
+                // shared_ptr storage
+                if (storage_ptr->GetStorageType() == ManagedTypeStorageType::SHARED_PTR) {
+                    return static_cast<ManagedTypeSharedPtr<RawT>*>(storage_ptr)
+                        ->GetValue();
+                }
 
-        if (storage_ptr) {
-            // shared_ptr is a special case where it must specifically have
-            // shared_ptr storage
-            if (storage_ptr->GetStorageType() == ManagedTypeStorageType::SHARED_PTR) {
-                return static_cast<ManagedTypeSharedPtr<RawT>*>(storage_ptr)
-                    ->GetValue();
+                throw exceptions::GluaBaseException(
+                    ("Failed to get registered type as shared_ptr because it was not "
+                     "storaged as shared_ptr ["
+                        + unique_name_opt.value().get())
+                        .append("]"));
             }
 
+            // all above cases return, so type must be unregistered
             throw exceptions::GluaBaseException(
-                ("Failed to get registered type as shared_ptr because it was not "
-                 "storaged as shared_ptr ["
-                    + unique_name_opt.value().get())
+                ("Failed to get registered type [" + unique_name_opt.value().get())
                     .append("]"));
         }
 
-        // all above cases return, so type must be unregistered
+        // if we got here we have an invalid class name
         throw exceptions::GluaBaseException(
-            ("Failed to get registered type [" + unique_name_opt.value().get())
-                .append("]"));
+            "Attempted to get registered type without valid class name");
     }
-
-    // if we got here we have an invalid class name
-    throw exceptions::GluaBaseException(
-        "Attempted to get registered type without valid class name");
 }
 template <typename T>
 auto GluaResolver<std::shared_ptr<T>>::is(GluaBase* glua, int stack_index)
@@ -271,16 +271,16 @@ auto GluaResolver<std::shared_ptr<T>>::is(GluaBase* glua, int stack_index)
 
     if constexpr (std::is_enum<RawT>::value) {
         return GluaResolver<uint64_t>::is(glua, stack_index);
+    } else {
+        auto unique_name_opt = glua->getUniqueClassName<RawT>();
+
+        if (unique_name_opt.has_value()) {
+            return glua->isUserType(unique_name_opt.value(), stack_index);
+        }
+
+        throw exceptions::GluaBaseException(
+            "Attempted to check against a registered type without valid class name");
     }
-
-    auto unique_name_opt = glua->getUniqueClassName<RawT>();
-
-    if (unique_name_opt.has_value()) {
-        return glua->isUserType(unique_name_opt.value(), stack_index);
-    }
-
-    throw exceptions::GluaBaseException(
-        "Attempted to check against a registered type without valid class name");
 }
 template <typename T>
 auto GluaResolver<std::shared_ptr<T>>::push(GluaBase* glua,
