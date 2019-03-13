@@ -28,14 +28,16 @@ function example_library_functions()
     print("os.time() = " .. os.time())
 end
 
-function example_managed_cpp_class()
+function example_managed_cpp_class(incoming_ref)
     bound_class_1 = CreateExampleClass(1337)
     bound_class_2 = CreateExampleClass(10101)
 
     print("bound_class_1:GetValue() = " .. bound_class_1:GetValue())
     print("bound_class_2:GetValue() = " .. bound_class_2:GetValue())
+    print("incoming_ref:GetValue() = " .. incoming_ref:GetValue())
 
     bound_class_1:Increment(bound_class_2)
+    incoming_ref:SetValue(incoming_ref:GetValue() + 1)
 
     print("post increment value = " .. bound_class_1:GetValue())
 
@@ -112,3 +114,15 @@ function example_nested_table()
         value = 1
     }
 end
+
+function example_bind_lambda()
+    -- example lambda should take two ints and return a^b
+    local result = example_lambda(2, 8)
+    print("example_lambda(2, 8) = " .. result)
+end
+
+function example_lua_array()
+    return { "hi there", "derp", 1337, -5.5 }
+end
+
+return "top level script can returns values!", 1337
