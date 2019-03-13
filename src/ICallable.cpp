@@ -1,8 +1,8 @@
 #include "glua/ICallable.h"
 
-namespace kdk
-{
-Callable::Callable(std::unique_ptr<ICallable> callable) : m_callable(std::move(callable))
+namespace kdk {
+Callable::Callable(std::unique_ptr<ICallable> callable)
+    : m_callable(std::move(callable))
 {
 }
 

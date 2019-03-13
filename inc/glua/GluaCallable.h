@@ -4,16 +4,14 @@
 
 #include <memory>
 
-namespace kdk::glua
-{
+namespace kdk::glua {
 class GluaBase;
 
-template<typename Functor, typename... Params>
-class GluaCallable : public DeferredArgumentCallable<GluaBase, Functor, Params...>
-{
+template <typename Functor, typename... Params>
+class GluaCallable : public DeferredArgumentCallable<GluaBase, Functor, Params...> {
 public:
     GluaCallable(GluaBase* glua, Functor functor);
-    GluaCallable(const GluaCallable&)     = default;
+    GluaCallable(const GluaCallable&) = default;
     GluaCallable(GluaCallable&&) noexcept = default;
 
     auto operator=(const GluaCallable&) -> GluaCallable& = default;

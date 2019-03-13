@@ -18,41 +18,41 @@ class GluaBase;
  */
 class StackPosition {
 public:
-  /**
+    /**
    * Constructs a new stack position to represent the (already existing) value
    * at the given index
    *
    * @param glua the glua instance this stack position belongs to
    * @param position the position on the glua stack for this value
    */
-  StackPosition(GluaBase *glua, int position);
+    StackPosition(GluaBase* glua, int position);
 
-  StackPosition(const StackPosition &) = delete;
-  auto operator=(const StackPosition &) -> StackPosition & = delete;
+    StackPosition(const StackPosition&) = delete;
+    auto operator=(const StackPosition&) -> StackPosition& = delete;
 
-  /**
+    /**
    * Move constructor/assignment, move the stack position out of the rhs
    * and into this one. rhs is left without a valid index and should not
    * be used again
    *
    * @{
    */
-  StackPosition(StackPosition &&rhs) noexcept;
-  auto operator=(StackPosition &&rhs) noexcept -> StackPosition &;
-  /** @} */
+    StackPosition(StackPosition&& rhs) noexcept;
+    auto operator=(StackPosition&& rhs) noexcept -> StackPosition&;
+    /** @} */
 
-  /**
+    /**
    * @return the stack index for this value
    */
-  auto GetStackIndex() const -> int;
-  /**
+    auto GetStackIndex() const -> int;
+    /**
    * @brief Releases the stack index from this position without popping it
    * off the stack. This object must not be used again and calling code now
    * must manage the stack index and make sure it gets popped appropriately
    */
-  auto Release() -> void;
+    auto Release() -> void;
 
-  /**
+    /**
    * Pushes the child of this object with the given index onto the stack
    * and returns a StackPosition referring to it. If the child doesn't
    * exist a null value will be pushed onto the stack.
@@ -63,8 +63,8 @@ public:
    * @throws std::bad_optional_access if this StackPosition no longer
    * holds an index (either it's been moved or Release was called).
    */
-  auto PushChild(size_t child_index) const -> StackPosition;
-  /**
+    auto PushChild(size_t child_index) const -> StackPosition;
+    /**
    * Pushes the child of this object with the given key onto the stack
    * and returns a StackPosition referring to it. If the child doesn't
    * exist a null value will be pushed onto the stack.
@@ -75,9 +75,9 @@ public:
    * @throws std::bad_optional_access if this StackPosition no longer
    * holds an index (either it's been moved or Release was called).
    */
-  auto PushChild(const std::string &child_key) const -> StackPosition;
+    auto PushChild(const std::string& child_key) const -> StackPosition;
 
-  /**
+    /**
    * Pushes the child of this object with the given index onto the stack
    * and returns a StackPosition referring to it. If the child doesn't
    * exist an exception is thrown.
@@ -91,8 +91,8 @@ public:
    * @throws std::out_of_range if there is no child with the given
    * index
    */
-  auto SafePushChild(size_t child_index) const -> StackPosition;
-  /**
+    auto SafePushChild(size_t child_index) const -> StackPosition;
+    /**
    * Pushes the child of this object with the given key onto the stack
    * and returns a StackPosition referring to it. If the child doesn't
    * exist an exception is thrown.
@@ -106,52 +106,55 @@ public:
    * @throws std::out_of_range if there is no child with the given
    * key
    */
-  auto SafePushChild(const std::string &child_key) const -> StackPosition;
+    auto SafePushChild(const std::string& child_key) const -> StackPosition;
 
-  /**
+    /**
    * @tparam Type the type to convert this item to
    * @return The value of the item this position refers to converted to
    * the requested type
    */
-  template <typename Type> auto As() const -> Type;
+    template <typename Type>
+    auto As() const -> Type;
 
-  /**
+    /**
    * @tparam Type the Type this value is checked against
    * @return true if the item this position refers to is of the given type
    */
-  template <typename Type> auto Is() const -> bool;
+    template <typename Type>
+    auto Is() const -> bool;
 
-  /**
+    /**
    * @tparam Type the expected type of this value
    * @return the value of this item with the given type
    *
    * @throws std::runtime_error if the item was not of the requested type
    */
-  template <typename Type> auto Get() const -> Type;
+    template <typename Type>
+    auto Get() const -> Type;
 
-  /**
+    /**
    * @return true if the value at this position is an array
    */
-  auto IsArray() const -> bool;
+    auto IsArray() const -> bool;
 
-  /**
+    /**
    * @return true if the value at this position is a map
    */
-  auto IsMap() const -> bool;
+    auto IsMap() const -> bool;
 
-  /**
+    /**
    * @return the number of children the array at this position has
    */
-  auto GetArrayLength() const -> size_t;
+    auto GetArrayLength() const -> size_t;
 
-  /**
+    /**
    * @brief Destructor which pops the item off the top of the stack
    */
-  ~StackPosition();
+    ~StackPosition();
 
 private:
-  GluaBase *m_glua; ///< The glua instance this stack position belongs to
-  std::optional<int> m_position; ///< The stack index of this item
+    GluaBase* m_glua; ///< The glua instance this stack position belongs to
+    std::optional<int> m_position; ///< The stack index of this item
 };
 } // namespace kdk::glua
 
