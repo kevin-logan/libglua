@@ -456,7 +456,9 @@ auto GluaLua::pushGlobal(const std::string &name) -> void {
 
   lua_remove(m_lua.get(), -2); // remove sandbox env from stack
 }
-auto GluaLua::popOffStack(size_t count) -> void { lua_pop(m_lua.get(), count); }
+auto GluaLua::popOffStack(size_t count) -> void {
+  lua_pop(m_lua.get(), static_cast<int>(count));
+}
 auto GluaLua::getStackTop() -> int { return lua_gettop(m_lua.get()); }
 auto GluaLua::callScriptFunctionImpl(const std::string &function_name,
                                      size_t arg_count) -> void {
@@ -476,7 +478,8 @@ auto GluaLua::callScriptFunctionImpl(const std::string &function_name,
 
   lua_getglobal(m_lua.get(), "__libglua__env__");
   lua_setfenv(m_lua.get(), -2);
-  if (lua_pcall(m_lua.get(), arg_count, LUA_MULTRET, 0) != 0) {
+  if (lua_pcall(m_lua.get(), static_cast<int>(arg_count), LUA_MULTRET, 0) !=
+      0) {
     throw exceptions::LuaException("Failed to call lua script function [" +
                                    function_name +
                                    "]: " + lua_tostring(m_lua.get(), -1));

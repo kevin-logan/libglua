@@ -290,7 +290,7 @@ static auto example_nested_table(kdk::glua::GluaLua &glua) -> void {
         {
           auto final_value = third_nest_index.PushChild("value").Get<int32_t>();
 
-          std::cout << __PRETTY_FUNCTION__ << " results:" << std::endl;
+          std::cout << __FUNCTION__ << " results:" << std::endl;
           std::cout << "\tgot outmost value: " << first_value << std::endl;
           std::cout << "\tgot level_one value: " << second_value << std::endl;
           std::cout << "\tgot level_two value: " << third_value << std::endl;

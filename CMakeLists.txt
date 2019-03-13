@@ -41,7 +41,13 @@ add_executable(libglua-examples
     src/examples/examples.cpp
 )
 
+set(DEPENDENCIES glua ${LIBLUA})
+
+if(UNIX)
+    set(DEPENDENCIES ${DEPENDENCIES} m dl)
+endif()
+
 target_include_directories(libglua-examples SYSTEM PRIVATE ${LUA_INCLUDE_PATH})
 target_include_directories(libglua-examples PRIVATE "${PROJECT_SOURCE_DIR}/inc")
-target_link_libraries(libglua-examples PRIVATE m dl glua ${LIBLUA})
+target_link_libraries(libglua-examples PRIVATE ${DEPENDENCIES})
 target_compile_features(libglua-examples PRIVATE cxx_std_17)

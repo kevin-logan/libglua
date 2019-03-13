@@ -7,7 +7,8 @@ template <typename Type>
 auto GluaBase::deferred_argument_get(const ICallable *callable, size_t index)
     -> Type {
   auto *glua_ptr = static_cast<GluaBase *>(callable->GetImplementationData());
-  return glua_ptr->Get<Type>(glua_ptr->transformFunctionParameterIndex(index));
+  return glua_ptr->Get<Type>(
+      static_cast<int>(glua_ptr->transformFunctionParameterIndex(index)));
 }
 template <typename Type>
 auto GluaBase::deferred_argument_push(const ICallable *callable, Type &&value)
