@@ -198,20 +198,26 @@ auto GluaResolver<std::reference_wrapper<T>>::push(
 {
     using RawT = std::decay_t<T>;
 
-    if constexpr (std::is_enum<RawT>::value) {
-        GluaResolver<uint64_t>::push(glua, static_cast<uint64_t>(value));
+    if constexpr (std::is_const<T>::value) {
+        // scripting languages often have no concept of const
+        // push by value
+        GluaResolver<RawT>::push(glua, value.get());
     } else {
-        auto unique_name_opt = glua->getUniqueClassName<RawT>();
-
-        if (unique_name_opt.has_value()) {
-            // create storage, hand off to implementation
-            glua->pushUserType(unique_name_opt.value(),
-                std::make_unique<ManagedTypeRawPtr<RawT>>(
-                    static_cast<RawT*>(&value.get())));
-
+        if constexpr (std::is_enum<RawT>::value) {
+            GluaResolver<uint64_t>::push(glua, static_cast<uint64_t>(value));
         } else {
-            throw exceptions::GluaBaseException(
-                "Attempted to push unregistered type");
+            auto unique_name_opt = glua->getUniqueClassName<RawT>();
+
+            if (unique_name_opt.has_value()) {
+                // create storage, hand off to implementation
+                glua->pushUserType(unique_name_opt.value(),
+                    std::make_unique<ManagedTypeRawPtr<RawT>>(
+                        static_cast<RawT*>(&value.get())));
+
+            } else {
+                throw exceptions::GluaBaseException(
+                    "Attempted to push unregistered type");
+            }
         }
     }
 }
