@@ -25,10 +25,10 @@ set(SOURCE_FILES
 )
 
 add_library(glua ${SOURCE_FILES})
-
-target_include_directories(glua SYSTEM PRIVATE ${LUA_INCLUDE_PATH})
-target_include_directories(glua PRIVATE ${PROJECT_SOURCE_DIR}/inc)
-target_compile_features(glua PRIVATE cxx_std_17)
+target_compile_features(glua PUBLIC cxx_std_17)
+target_include_directories(glua SYSTEM PUBLIC ${LUA_INCLUDE_PATH})
+target_include_directories(glua PUBLIC ${PROJECT_SOURCE_DIR}/inc)
+target_link_libraries(glua PUBLIC ${LIBLUA})
 
 if(UNIX)
     target_compile_options(glua PRIVATE -Wall -Wextra -Werror)
