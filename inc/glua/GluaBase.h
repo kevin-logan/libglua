@@ -216,8 +216,8 @@ public:
    * index
    *
    * @tparam Type the type of the value that should be checked for
-   * @param index the index of the element to check (negative indices work from
-   *              the top of the stack, e.g. -1  is the top of the stack, 0 is
+   * @param stack_index the index of the element to check (negative indices work from
+   *                    the top of the stack, e.g. -1  is the top of the stack, 0 is
    * the bottom, and 1 is 1 from the bottom)
    * @return true if the value at that index is of the given Type
    */
@@ -229,9 +229,9 @@ public:
    * converts it to `Type`
    *
    * @tparam Type the type of the value that it should be converted to
-   * @param index the index of the element to retrieve (negative indices work
-   * from the top of the stack, e.g. -1  is the top of the stack, 0 is the
-   *              bottom, and 1 is 1 from the bottom)
+   * @param stack_index the index of the element to retrieve (negative indices work
+   *                    from the top of the stack, e.g. -1  is the top of the stack, 0 is the
+   *                    bottom, and 1 is 1 from the bottom)
    * @return the value at the given index converted to `Type`
    */
     template <typename Type>
@@ -244,9 +244,9 @@ public:
    *
    *
    * @tparam Type the type of the value that it should be retrieved as
-   * @param index the index of the element to retrieve (negative indices work
-   * from the top of the stack, e.g. -1  is the top of the stack, 0 is the
-   *              bottom, and 1 is 1 from the bottom)
+   * @param stack_index the index of the element to retrieve (negative indices work
+   *                    from the top of the stack, e.g. -1  is the top of the stack, 0 is the
+   *                    bottom, and 1 is 1 from the bottom)
    * @return the value at the given index of type `Type`
    * @throws std::runtime_error if the value at the given index is not of type
    * `Type`
@@ -280,7 +280,7 @@ public:
     /**
    * @param stack_index the index of the value to check
    *
-   * @returnsthe number of children the array at the given index has
+   * @return the number of children the array at the given index has
    */
     auto GetArrayLength(int stack_index) -> size_t;
 
@@ -322,7 +322,6 @@ public:
    * stack, and putting return values back on the glua stack
    *
    * @tparam Functor the type of the actual functor for the callable
-   * @tparam Params the parameters the functor receives when called
    * @param f the actual functor for the callable
    * @return Callable a wrapped GluaCallable as a Callable
    */
