@@ -4,11 +4,6 @@ project (glua)
 set(LUA_INCLUDE_PATH "/usr/include/luajit-2.1" CACHE PATH "User specified lua include path.")
 set(LIBLUA "/lib64/libluajit-5.1.so" CACHE FILEPATH "User specified lua library location.")
 
-find_program(CLANG_TIDY_BIN NAMES "clang-tidy" DOC "clang-tidy binary location")
-if(CLANG_TIDY_BIN)
-    set(CLANG_TIDY_COMMAND "${CLANG_TIDY_BIN}" "-checks=*,-clang-analyzer-alpha.*,-fuchsia-overloaded-operator,-fuchsia-trailing-return,-fuchsia-default-arguments,-readability-else-after-return,-google-readability-namespace-comments,-llvm-namespace-comment,-hicpp-no-array-decay,-cppcoreguidelines-pro-bounds-array-to-pointer-decay,-google-default-arguments,-llvm-header-guard,-google-runtime-references,-misc-macro-parentheses,-bugprone-macro-parentheses,-bugprone-unused-return-value" "-header-filter=.*")
-endif()
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(SOURCE_FILES
@@ -36,9 +31,6 @@ else()
     target_compile_options(glua PRIVATE /W4 /WX)
 endif()
 
-if(CLANG_TIDY_BIN)
-    set_target_properties(glua PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
-endif()
 
 ### EXAMPLE PROJECT ###
 project (libglua-examples)
