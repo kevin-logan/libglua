@@ -41,3 +41,6 @@ CMakeLists.txt.user
 # Ignore build directories
 /Debug/
 /Release/
+/build_bat_debug/
+/build_bat_release/
+/build/
