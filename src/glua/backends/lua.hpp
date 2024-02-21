@@ -1,6 +1,6 @@
 #pragma once
 
-#include "glua.hpp"
+#include "glua/glua.hpp"
 
 extern "C" {
 #include "lauxlib.h"
@@ -30,7 +30,7 @@ struct converter<T> {
         if (str) {
             return std::string { str };
         } else {
-            return std::unexpected("lua value could not be converted to string");
+            return unexpected("lua value could not be converted to string");
         }
     }
 };
@@ -275,10 +275,10 @@ struct class_registration_impl {
             if (data->mutable_) {
                 return data->ptr_;
             } else {
-                return std::unexpected("unwrap failed - attempted to extract mutable reference to const object");
+                return unexpected("unwrap failed - attempted to extract mutable reference to const object");
             }
         } else {
-            return std::unexpected("unwrap on non-object value");
+            return unexpected("unwrap on non-object value");
         }
     }
 
@@ -288,7 +288,7 @@ struct class_registration_impl {
             auto* data = static_cast<wrap_data*>(lua_touserdata(lua, 1));
             return data->ptr_;
         } else {
-            return std::unexpected("unwrap on non-object value");
+            return unexpected("unwrap on non-object value");
         }
     }
 
@@ -375,7 +375,7 @@ struct class_registration_impl {
                        lua_pushstring(lua, error.data());
                        lua_error(lua);
 
-                       return std::unexpected("lua: unreachable post lua_error code reached");
+                       return unexpected("lua: unreachable post lua_error code reached");
                    })
                    .value();
     }
@@ -388,7 +388,7 @@ struct class_registration_impl {
             return from_lua<T&>(lua, 1).and_then([&](T& self) -> result<int> {
                 return from_lua<V>(lua, 3).and_then([&](V value) -> result<int> {
                     if constexpr (std::is_const_v<V>) {
-                        return std::unexpected("lua: attempt to set const field");
+                        return unexpected("lua: attempt to set const field");
                     } else {
                         (self.*field.field_ptr_) = std::move(value);
                     }
@@ -401,7 +401,7 @@ struct class_registration_impl {
                        lua_pushstring(lua, error.data());
                        lua_error(lua);
 
-                       return std::unexpected("lua: unreachable post lua_error code reached");
+                       return unexpected("lua: unreachable post lua_error code reached");
                    })
                    .value();
     }
@@ -422,14 +422,14 @@ struct class_registration_impl {
                                                 if (pos != index_handlers.end()) {
                                                     return pos->second(lua);
                                                 } else {
-                                                    return std::unexpected(std::format("no field or method '{}'", value));
+                                                    return unexpected(std::format("no field or method '{}'", value));
                                                 }
                                             })
             .or_else([&](const std::string& error) -> result<int> {
                 lua_pushstring(lua, error.data());
                 lua_error(lua);
 
-                return std::unexpected("lua: unreachable post lua_error code reached");
+                return unexpected("lua: unreachable post lua_error code reached");
             })
             .value();
     }
@@ -442,14 +442,14 @@ struct class_registration_impl {
                                                 if (pos != newindex_handlers.end()) {
                                                     return pos->second(lua);
                                                 } else {
-                                                    return std::unexpected(std::format("no field or method '{}'", value));
+                                                    return unexpected(std::format("no field or method '{}'", value));
                                                 }
                                             })
             .or_else([&](const std::string& error) -> result<int> {
                 lua_pushstring(lua, error.data());
                 lua_error(lua);
 
-                return std::unexpected("lua: unreachable post lua_error code reached");
+                return unexpected("lua: unreachable post lua_error code reached");
             })
             .value();
     }
@@ -638,7 +638,7 @@ int call_generic_wrapped_functor(generic_functor<ReturnType, ArgTypes...>& f, lu
                    lua_pushstring(lua, error.data());
                    lua_error(lua);
 
-                   return std::unexpected("lua: unreachable post lua_error code reached");
+                   return unexpected("lua: unreachable post lua_error code reached");
                })
                .value();
 }
@@ -659,9 +659,9 @@ auto callback_for(const generic_functor<ReturnType, ArgTypes...>&)
 
 class backend {
 public:
-    static result<std::unique_ptr<backend>> create()
+    static result<std::unique_ptr<backend>> create(bool start_sandboxed = true)
     {
-        return std::unique_ptr<backend>(new backend {});
+        return std::unique_ptr<backend>(new backend { start_sandboxed });
     }
 
     template <typename ReturnType>
@@ -678,7 +678,7 @@ public:
                 result_code = lua_pcall(lua_, 0, std::same_as<ReturnType, void> ? 0 : 1, 0);
 
                 if (result_code != 0) {
-                    return std::unexpected(std::format("Failed to call script: {}", lua_tostring(lua_, -1)));
+                    return unexpected(std::format("Failed to call script: {}", lua_tostring(lua_, -1)));
                 }
 
                 if constexpr (std::same_as<ReturnType, void>) {
@@ -687,7 +687,7 @@ public:
                     return from_lua<ReturnType>(lua_, -1);
                 }
             } else {
-                return std::unexpected(std::format("Failed to load script: {}", lua_tostring(lua_, -1)));
+                return unexpected(std::format("Failed to load script: {}", lua_tostring(lua_, -1)));
             }
         }();
         lua_settop(lua_, top);
@@ -762,7 +762,7 @@ public:
             auto call_result = lua_pcall(lua_, sizeof...(Args), std::same_as<ReturnType, void> ? 0 : 1, 0);
 
             if (call_result != 0) {
-                return std::unexpected(std::format("lua call failed: {}", lua_tostring(lua_, -1)));
+                return unexpected(std::format("lua call failed: {}", lua_tostring(lua_, -1)));
             }
 
             if constexpr (std::same_as<ReturnType, void>) {
@@ -803,12 +803,12 @@ public:
     }
 
 private:
-    backend()
+    backend(bool start_sandboxed)
         : lua_(luaL_newstate())
     {
         luaL_openlibs(lua_);
 
-        build_sandbox();
+        build_sandbox(start_sandboxed);
 
         // let's create the env table
         lua_newtable(lua_); // env
@@ -821,47 +821,55 @@ private:
         lua_setglobal(lua_, env_name); // empty stack
     }
 
-    void build_sandbox()
+    void build_sandbox(bool start_sandboxed)
     {
-        // lookup the global for each of these and push them onto env
-        std::vector<std::string> sandbox_environment {
-            "assert", "error", "ipairs", "next", "pairs",
-            "pcall", "print", "select", "tonumber", "tostring",
-            "type", "unpack", "_VERSION", "xpcall", "isfunction"
-        };
-        std::map<std::string, std::vector<std::string>> sandbox_sub_environments = {
-            { "coroutine", std::vector<std::string> { "create", "resume", "running", "status", "wrap", "yield" } },
-            { "io", std::vector<std::string> { "read", "write", "flush", "type" } },
-            { "string", std::vector<std::string> { "byte", "char", "dump", "find", "format", "gmatch", "gsub", "len", "lower", "match", "rep", "reverse", "sub", "upper" } },
-            { "table", std::vector<std::string> { "insert", "maxn", "remove", "sort", "concat" } },
-            { "math", std::vector<std::string> { "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "cosh", "deg", "exp", "floor", "fmod", "frexp", "huge", "ldexp", "log", "log10", "max", "min", "modf", "pi", "pow", "rad", "random", "sin", "sinh", "sqrt", "tan", "tanh" } },
-            { "os", std::vector<std::string> { "clock", "difftime", "time" } }
-        };
+        if (start_sandboxed) {
+            // lookup the global for each of these and push them onto env
+            std::vector<std::string> sandbox_environment {
+                "assert", "error", "ipairs", "next", "pairs",
+                "pcall", "print", "select", "tonumber", "tostring",
+                "type", "unpack", "_VERSION", "xpcall", "isfunction"
+            };
+            std::map<std::string, std::vector<std::string>> sandbox_sub_environments = {
+                { "coroutine", std::vector<std::string> { "create", "resume", "running", "status", "wrap", "yield" } },
+                { "io", std::vector<std::string> { "read", "write", "flush", "type" } },
+                { "string", std::vector<std::string> { "byte", "char", "dump", "find", "format", "gmatch", "gsub", "len", "lower", "match", "rep", "reverse", "sub", "upper" } },
+                { "table", std::vector<std::string> { "insert", "maxn", "remove", "sort", "concat" } },
+                { "math", std::vector<std::string> { "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "cosh", "deg", "exp", "floor", "fmod", "frexp", "huge", "ldexp", "log", "log10", "max", "min", "modf", "pi", "pow", "rad", "random", "sin", "sinh", "sqrt", "tan", "tanh" } },
+                { "os", std::vector<std::string> { "clock", "difftime", "time" } }
+            };
 
-        lua_newtable(lua_); // env__index;
-        for (const auto& f : sandbox_environment) {
-            lua_pushstring(lua_, f.data());
-            lua_getglobal(lua_, f.data());
-            lua_settable(lua_, -3); // set env__index["name"] = globals["name"]
-        }
-
-        // top of stack is still env__index
-        for (const auto& [sub_environment_name, items] : sandbox_sub_environments) {
-            lua_pushstring(lua_, sub_environment_name.data()); // env__index, "subenv"
-            lua_newtable(lua_); // env__index, "subenv", subenv
-            lua_getglobal(lua_, sub_environment_name.data()); // env__index, "subenv", subenv, globals["subenv"]
-            for (const auto& f : items) {
-                // need to get f from coroutine table, push onto env_index["subenv"];
-                lua_pushstring(lua_, f.data()); // env__index, "subenv", subenv, globals["subenv"], "name"
-                lua_pushvalue(lua_, -1); // env__index, "subenv", subenv, globals["subenv"], "name", "name"
-                lua_gettable(lua_, -3); // env__index, "subenv", subenv, globals["subenv"], "name", globals["subenv"]["name"]
-                lua_settable(lua_, -4); // env__index, "subenv", subenv, globals["subenv"]
+            lua_newtable(lua_); // env__index;
+            for (const auto& f : sandbox_environment) {
+                lua_pushstring(lua_, f.data());
+                lua_getglobal(lua_, f.data());
+                lua_settable(lua_, -3); // set env__index["name"] = globals["name"]
             }
-            lua_pop(lua_, 1); // env__index, "subenv", subenv
-            lua_settable(lua_, -3); // env__index
-        }
 
-        lua_setglobal(lua_, env__index_name); // stack now back to start
+            // top of stack is still env__index
+            for (const auto& [sub_environment_name, items] : sandbox_sub_environments) {
+                lua_pushstring(lua_, sub_environment_name.data()); // env__index, "subenv"
+                lua_newtable(lua_); // env__index, "subenv", subenv
+                lua_getglobal(lua_, sub_environment_name.data()); // env__index, "subenv", subenv, globals["subenv"]
+                for (const auto& f : items) {
+                    // need to get f from coroutine table, push onto env_index["subenv"];
+                    lua_pushstring(lua_, f.data()); // env__index, "subenv", subenv, globals["subenv"], "name"
+                    lua_pushvalue(lua_, -1); // env__index, "subenv", subenv, globals["subenv"], "name", "name"
+                    lua_gettable(lua_, -3); // env__index, "subenv", subenv, globals["subenv"], "name", globals["subenv"]["name"]
+                    lua_settable(lua_, -4); // env__index, "subenv", subenv, globals["subenv"]
+                }
+                lua_pop(lua_, 1); // env__index, "subenv", subenv
+                lua_settable(lua_, -3); // env__index
+            }
+
+            lua_setglobal(lua_, env__index_name); // stack now back to start
+        } else {
+            // when not using a sandbox:
+            //   env.__index -> _G
+            // where _G is the default lua globals table
+            lua_getglobal(lua_, "_G");
+            lua_setglobal(lua_, env__index_name);
+        }
     }
 
     static constexpr char env_name[] = "__glua_env";
@@ -870,4 +878,4 @@ private:
     lua_State* lua_;
 };
 
-} // namespace spidermonkey
+} // namespace glua::lua

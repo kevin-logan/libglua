@@ -1,6 +1,9 @@
 #pragma once
 
-#include "glua.hpp"
+#include "glua/glua.hpp"
+
+#include <jsapi.h>
+#include <jsfriendapi.h>
 
 #include <js/CallArgs.h>
 #include <js/CompilationAndEvaluation.h>
@@ -11,8 +14,6 @@
 #include <js/RootingAPI.h>
 #include <js/SourceText.h>
 #include <js/Value.h>
-#include <jsapi.h>
-#include <jsfriendapi.h>
 
 #include <format>
 
@@ -35,7 +36,7 @@ struct converter<T> {
         std::string retval;
         retval.resize(size);
         if (!JS_EncodeStringToBuffer(cx, str, retval.data(), size)) {
-            return std::unexpected("Could not encode js string to buffer");
+            return unexpected("Could not encode js string to buffer");
         }
 
         // might contain '\0' that we still need to trim...?
@@ -56,7 +57,7 @@ struct converter<T> {
 
 template <>
 struct converter<int8_t> {
-    static result<JS::Value> to_js(JSContext* cx, int8_t v)
+    static result<JS::Value> to_js(JSContext*, int8_t v)
     {
         JS::Value result;
         result.setNumber(v);
@@ -74,7 +75,7 @@ struct converter<int8_t> {
 
 template <>
 struct converter<uint8_t> {
-    static result<JS::Value> to_js(JSContext* cx, uint8_t v)
+    static result<JS::Value> to_js(JSContext*, uint8_t v)
     {
         JS::Value result;
         result.setNumber(v);
@@ -92,7 +93,7 @@ struct converter<uint8_t> {
 
 template <>
 struct converter<int16_t> {
-    static result<JS::Value> to_js(JSContext* cx, int16_t v)
+    static result<JS::Value> to_js(JSContext*, int16_t v)
     {
         JS::Value result;
         result.setNumber(v);
@@ -110,7 +111,7 @@ struct converter<int16_t> {
 
 template <>
 struct converter<uint16_t> {
-    static result<JS::Value> to_js(JSContext* cx, uint16_t v)
+    static result<JS::Value> to_js(JSContext*, uint16_t v)
     {
         JS::Value result;
         result.setNumber(v);
@@ -128,7 +129,7 @@ struct converter<uint16_t> {
 
 template <>
 struct converter<int32_t> {
-    static result<JS::Value> to_js(JSContext* cx, int32_t v) { return JS::Int32Value(v); }
+    static result<JS::Value> to_js(JSContext*, int32_t v) { return JS::Int32Value(v); }
 
     static result<int32_t> from_js(JSContext* cx, JS::HandleValue v)
     {
@@ -141,7 +142,7 @@ struct converter<int32_t> {
 
 template <>
 struct converter<uint32_t> {
-    static result<JS::Value> to_js(JSContext* cx, uint32_t v)
+    static result<JS::Value> to_js(JSContext*, uint32_t v)
     {
         JS::Value result;
         result.setNumber(v);
@@ -159,7 +160,7 @@ struct converter<uint32_t> {
 
 template <>
 struct converter<int64_t> {
-    static result<JS::Value> to_js(JSContext* cx, int64_t v)
+    static result<JS::Value> to_js(JSContext*, int64_t v)
     {
         JS::Value result;
         result.setNumber(v);
@@ -177,7 +178,7 @@ struct converter<int64_t> {
 
 template <>
 struct converter<uint64_t> {
-    static result<JS::Value> to_js(JSContext* cx, uint64_t v)
+    static result<JS::Value> to_js(JSContext*, uint64_t v)
     {
         JS::Value result;
         result.setNumber(v);
@@ -195,7 +196,7 @@ struct converter<uint64_t> {
 
 template <>
 struct converter<float> {
-    static result<JS::Value> to_js(JSContext* cx, float v) { return JS::Float32Value(v); }
+    static result<JS::Value> to_js(JSContext*, float v) { return JS::Float32Value(v); }
 
     static result<float> from_js(JSContext* cx, JS::HandleValue v)
     {
@@ -208,7 +209,7 @@ struct converter<float> {
 
 template <>
 struct converter<double> {
-    static result<JS::Value> to_js(JSContext* cx, double v) { return JS::DoubleValue(v); }
+    static result<JS::Value> to_js(JSContext*, double v) { return JS::DoubleValue(v); }
 
     static result<double> from_js(JSContext* cx, JS::HandleValue v)
     {
@@ -221,9 +222,9 @@ struct converter<double> {
 
 template <>
 struct converter<bool> {
-    static result<JS::Value> to_js(JSContext* cx, bool v) { return JS::BooleanValue(v); }
+    static result<JS::Value> to_js(JSContext*, bool v) { return JS::BooleanValue(v); }
 
-    static result<bool> from_js(JSContext* cx, JS::HandleValue v) { return JS::ToBoolean(v); }
+    static result<bool> from_js(JSContext*, JS::HandleValue v) { return JS::ToBoolean(v); }
 };
 
 template <decays_to_integral T>
@@ -280,10 +281,10 @@ struct class_registration_impl {
                 const JS::Value& reserved_value = JS::GetReservedSlot(&obj, SLOT_OBJECT_PTR);
                 return reinterpret_cast<T*>(reserved_value.toPrivate());
             } else {
-                return std::unexpected("unwrap failed - attempted to extract mutable reference to const object");
+                return unexpected("unwrap failed - attempted to extract mutable reference to const object");
             }
         } else {
-            return std::unexpected("unwrap on non-object value");
+            return unexpected("unwrap on non-object value");
         }
     }
 
@@ -294,7 +295,7 @@ struct class_registration_impl {
             const JS::Value& reserved_value = JS::GetReservedSlot(&obj, SLOT_OBJECT_PTR);
             return reinterpret_cast<T*>(reserved_value.toPrivate());
         } else {
-            return std::unexpected("unwrap (const) on non-object value");
+            return unexpected("unwrap (const) on non-object value");
         }
     }
 
@@ -370,7 +371,7 @@ struct class_registration_impl {
         }(field_data.field_ptr_)
                    .transform([]() { return true; })
                    .or_else([&](const auto& error) -> result<bool> {
-                       JS_ReportErrorASCII(cx, error.data());
+                       JS_ReportErrorASCII(cx, "%s", error.data());
                        return false;
                    })
                    .value();
@@ -397,7 +398,7 @@ struct class_registration_impl {
         }(field_data.field_ptr_)
                    .transform([]() { return true; })
                    .or_else([&](const auto& error) -> result<bool> {
-                       JS_ReportErrorASCII(cx, error.data());
+                       JS_ReportErrorASCII(cx, "%s", error.data());
                        return false;
                    })
                    .value();
@@ -471,7 +472,7 @@ struct class_registration_impl {
     static constexpr std::size_t SLOT_OBJECT_PTR { 0 };
     static constexpr std::size_t SLOT_VALUE_OWNED_BY_JS { 1 };
     static constexpr std::size_t SLOT_VALUE_MUTABLE { 2 };
-    static constexpr JSClass class_ { registration::name.data(), JSCLASS_HAS_RESERVED_SLOTS(3), &ops_ };
+    static inline const JSClass class_ { registration::name.data(), JSCLASS_HAS_RESERVED_SLOTS(3), &ops_, nullptr, nullptr, nullptr };
     static inline JS::PersistentRootedObject proto_;
 };
 
@@ -606,7 +607,7 @@ bool call_generic_wrapped_functor(generic_functor<ReturnType, ArgTypes...>& f, J
     }(std::index_sequence_for<ArgTypes...> {})
                .transform([]() { return true; })
                .or_else([&](const auto& error) -> result<bool> {
-                   JS_ReportErrorASCII(cx, error.data());
+                   JS_ReportErrorASCII(cx, "%s", error.data());
                    return false;
                })
                .value();
@@ -639,7 +640,7 @@ bool call_generic_wrapped_method(generic_functor<ReturnType, ClassType, ArgTypes
     }(std::index_sequence_for<ArgTypes...> {})
                .transform([]() { return true; })
                .or_else([&](const auto& error) -> result<bool> {
-                   JS_ReportErrorASCII(cx, error.data());
+                   JS_ReportErrorASCII(cx, "%s", error.data());
                    return false;
                })
                .value();
@@ -686,7 +687,7 @@ public:
     {
         JS::SourceText<mozilla::Utf8Unit> source;
         if (!source.init(cx_.value_, code.data(), code.size(), JS::SourceOwnership::Borrowed)) {
-            return std::unexpected("Spidermonkey failed to init source\n");
+            return unexpected("Spidermonkey failed to init source\n");
         }
 
         JS::CompileOptions compile_options { cx_.value_ };
@@ -694,12 +695,12 @@ public:
 
         JS::RootedScript compiled_script { cx_.value_, JS::Compile(cx_.value_, compile_options, source) };
         if (compiled_script == nullptr) {
-            return std::unexpected("Spidermonkey failed to compile script\n");
+            return unexpected("Spidermonkey failed to compile script\n");
         }
 
         JS::RootedValue return_value { cx_.value_ };
         if (!JS_ExecuteScript(cx_.value_, compiled_script, &return_value)) {
-            return std::unexpected("Spidermonkey failed to execute script\n");
+            return unexpected("Spidermonkey failed to execute script\n");
         }
 
         if constexpr (!std::same_as<ReturnType, void>) {
@@ -716,7 +717,7 @@ public:
                 cx_.value_, global_scope_, name.data(), callback_for(functor), functor.num_args, 0)
         };
         if (js_func == nullptr) {
-            return std::unexpected(std::format("Spidermonkey failed to define function"));
+            return unexpected(std::format("Spidermonkey failed to define function"));
         }
 
         auto* obj = JS_GetFunctionObject(js_func);
@@ -734,7 +735,7 @@ public:
             return from_js<T>(cx_.value_, prop);
         }
 
-        return std::unexpected(std::format("No global property with the name {} was found", name));
+        return unexpected(std::format("No global property with the name {} was found", name));
     }
 
     template <typename T>
@@ -743,7 +744,7 @@ public:
         return to_js(cx_.value_, std::move(value)).and_then([&](auto v) -> result<void> {
             JS::RootedValue value_handle { cx_.value_, v };
             if (!JS_SetProperty(cx_.value_, global_scope_, name.data(), value_handle)) {
-                return std::unexpected(std::format("Spidermonkey failed to set {} global", name));
+                return unexpected(std::format("Spidermonkey failed to set {} global", name));
             }
             return {};
         });
@@ -767,7 +768,7 @@ public:
             };
             JS::HandleValueArray call_args { rooted_args };
             if (!JS_CallFunctionName(cx_.value_, global_scope_, name.data(), call_args, &call_return)) {
-                return std::unexpected(std::format("Spidermonkey failed to call function with name {}", name));
+                return unexpected(std::format("Spidermonkey failed to call function with name {}", name));
             }
 
             if constexpr (!std::same_as<ReturnType, void>) {
@@ -849,7 +850,7 @@ private:
         static bool result { JS_Init() };
         static global_init init { result };
         if (!result) {
-            return std::unexpected("Spidermonkey failed to init (JS_Init)");
+            return unexpected("Spidermonkey failed to init (JS_Init)");
         }
 
         return {};
@@ -861,21 +862,21 @@ private:
         if (value) {
             return context { value };
         } else {
-            return std::unexpected("Spidermonkey failed to create context (JS_NewContext)");
+            return unexpected("Spidermonkey failed to create context (JS_NewContext)");
         }
     }
 
     static result<JSObject*> create_global_scope(JSContext* cx)
     {
         if (!JS::InitSelfHostedCode(cx)) {
-            return std::unexpected("Spidermonkey error initializing self hosted code");
+            return unexpected("Spidermonkey error initializing self hosted code");
         }
 
-        static JSClass global_object { "GlobalObject", JSCLASS_GLOBAL_FLAGS, &JS::DefaultGlobalClassOps };
+        static JSClass global_object { "GlobalObject", JSCLASS_GLOBAL_FLAGS, &JS::DefaultGlobalClassOps, nullptr, nullptr, nullptr };
         JS::RealmOptions options;
         JSObject* result = JS_NewGlobalObject(cx, &global_object, nullptr, JS::FireOnNewGlobalHook, options);
         if (result == nullptr) {
-            return std::unexpected("Spidermonkey error creating global scope");
+            return unexpected("Spidermonkey error creating global scope");
         }
 
         return result;
