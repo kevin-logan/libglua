@@ -256,7 +256,7 @@ template <typename T>
 using HandleValueFor = JS::HandleValue;
 
 template <typename... Ts>
-auto many_from_js(JSContext* cx, HandleValueFor<Ts>... vs)
+auto many_from_js([[maybe_unused]] JSContext* cx, HandleValueFor<Ts>... vs)
 {
     auto many_expected = std::make_tuple(from_js<Ts>(cx, vs)...);
     return many_results_to_one(std::move(many_expected));
@@ -272,7 +272,7 @@ template <registered_class T>
 struct class_registration_impl {
     using registration = class_registration<T>;
 
-    static result<T*> unwrap_object(JSContext* cx, JS::HandleValue v)
+    static result<T*> unwrap_object(JSContext*, JS::HandleValue v)
     {
         if (v.isObject()) {
             JSObject& obj = v.toObject();
@@ -288,7 +288,7 @@ struct class_registration_impl {
         }
     }
 
-    static result<const T*> unwrap_object_const(JSContext* cx, JS::HandleValue v)
+    static result<const T*> unwrap_object_const(JSContext*, JS::HandleValue v)
     {
         if (v.isObject()) {
             JSObject& obj = v.toObject();
@@ -339,7 +339,7 @@ struct class_registration_impl {
         return call_generic_wrapped_functor(*registration::constructor, cx, args);
     }
 
-    static void finalizer(JS::GCContext* gcx, JSObject* obj)
+    static void finalizer(JS::GCContext*, JSObject* obj)
     {
         const JS::Value& reserved_value_ptr = JS::GetReservedSlot(obj, SLOT_OBJECT_PTR);
         const JS::Value& reserved_value_owned = JS::GetReservedSlot(obj, SLOT_VALUE_OWNED_BY_JS);

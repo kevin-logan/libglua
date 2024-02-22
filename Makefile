@@ -1,5 +1,5 @@
-CC=clang
-CXX=clang++
+CC=gcc
+CXX=g++
 
 debug:
 	mkdir -p build_debug && \

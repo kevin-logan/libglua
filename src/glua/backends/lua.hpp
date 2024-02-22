@@ -242,7 +242,7 @@ template <typename T>
 using IndexFor = lua_Integer;
 
 template <typename... Ts>
-auto many_from_lua(lua_State* lua, IndexFor<Ts>... vs)
+auto many_from_lua([[maybe_unused]] lua_State* lua, IndexFor<Ts>... vs)
 {
     auto many_expected = std::make_tuple(from_lua<Ts>(lua, vs)...);
     return many_results_to_one(std::move(many_expected));
