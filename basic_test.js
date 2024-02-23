@@ -1,3 +1,5 @@
+basic_demonstration = true;
+
 function concat(...args) { return args.join(''); }
 
 // use var makes it visible after script exit, let/const will not be

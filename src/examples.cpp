@@ -73,35 +73,87 @@ struct glua::class_registration<sentinel> {
 };
 
 template <typename Backend>
+glua::result<void> basic_test_glua_instance(glua::instance<Backend>& glue)
+{
+    auto panic_value = glue.template get_global<bool>("panic");
+
+    if (panic_value.has_value()) {
+        if (panic_value.value()) {
+            format_print("PANIC OH DANG!\n");
+        } else {
+            format_print("explicitly told not to panic, nothing to see here\n");
+        }
+    }
+
+    return glue
+        .template call_function<std::string>(
+            "concat", 1, 2, true, false, std::string { "Hello, World!" })
+        .transform([&](auto concat_ret) { format_print("script concat returned {}\n", concat_ret); });
+}
+
+template <typename Backend>
+glua::result<void> advanced_test_glua_instance(glua::instance<Backend>& glue)
+{
+    return glue.template call_function<std::vector<int>>("get_array")
+        .and_then([&](auto val) {
+            format_print("Received vector of size {}\n", val.size());
+
+            for (auto& v : val) {
+                format_print("\t{}\n", v);
+            }
+
+            return glue.template call_function<std::unordered_map<std::string, glua::any>>("get_weights");
+        })
+        .and_then([&](auto weights) {
+            format_print("Received map of size {}\n", weights.size());
+            for (auto& [k, v] : weights) {
+                format_print("\t{}: {}\n", k, "<any>");
+            }
+
+            // 'any' objects are move-only, and as such we must also move any container that holds any objects
+            // as they are one-and-done. They rob ownership from their JS source and always return it when used
+            return glue.template call_function<void>("print_weights", std::move(weights));
+        })
+        .and_then([&]() {
+            std::vector<std::string> a {
+                "Hello", "World", "Derp", "Flerp"
+            };
+            return glue.template call_function<void>("print_array", a);
+        })
+        .and_then([&]() {
+            // let's call get_weights again, to create another sentinel, but we'll store it in an any and ignore the any
+            // despite never using the any the sentinel will destruct when the any destructs, rather than via JS ownership
+            return glue.template call_function<glua::any>("get_weights").transform([&](auto our_any) {
+                // ignore our_any
+                format_print("Ignoring the resulting any {} received from get_weights\n", static_cast<void*>(our_any.impl_.get()));
+            });
+        });
+}
+
+template <typename Backend>
 glua::result<void> test_glua_instance(std::string input, glua::instance<Backend>& glue)
 {
-    return glue.register_functor("add", glua::resolve_overload<int, int>(&cpp_add)).and_then([&]() {
-        return glue.register_functor("print", [](std::string param) { format_print("{}", param); })
-            .and_then([&]() {
-                return glue.set_global("magic", 13.37).and_then([&]() {
-                    glue.template register_class<sentinel>();
+    return glue.register_functor("add", glua::resolve_overload<int, int>(&cpp_add))
+        .and_then([&]() { return glue.register_functor("print", [](std::string param) { format_print("{}", param); }); })
+        .and_then([&]() {
+            return glue.set_global("magic", 13.37);
+        })
+        .and_then([&]() {
+            glue.template register_class<sentinel>();
 
-                    return glue.template execute_script<std::string>(input).and_then([&](auto script_result) {
-                        auto panic_value = glue.template get_global<bool>("panic");
-
-                        if (panic_value.has_value()) {
-                            if (panic_value.value()) {
-                                format_print("PANIC OH DANG!\n");
-                            } else {
-                                format_print("explicitly told not to panic, nothing to see here\n");
-                            }
-                        }
-
-                        format_print("Script returned [{}]\n", script_result);
-
-                        return glue
-                            .template call_function<std::string>(
-                                "concat", 1, 2, true, false, std::string { "Hello, World!" })
-                            .transform([&](auto concat_ret) { format_print("script concat returned {}\n", concat_ret); });
-                    });
-                });
+            return glue.template execute_script<std::string>(input).and_then([&](auto script_result) {
+                format_print("Script completed with result: {}\n", script_result);
+                // check which style of script
+                if (glue.template get_global<bool>("advanced_demonstration")) {
+                    return advanced_test_glua_instance(glue);
+                } else if (glue.template get_global<bool>("advanced_demonstration")) {
+                    return basic_test_glua_instance(glue);
+                } else {
+                    format_print("Finished executing unrecognized script\n");
+                    return glua::result<void> {};
+                }
             });
-    });
+        });
 }
 
 enum class script_type {

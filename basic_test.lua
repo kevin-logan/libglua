@@ -1,3 +1,5 @@
+basic_demonstration = true
+
 function concat(...)
     local result = ""
     local args = {...}
