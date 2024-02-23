@@ -188,123 +188,123 @@ result<void> converter<T>::push_to_lua(lua_State* lua, T v)
     return converter<std::decay_t<T>>::push_to_lua(lua, v);
 }
 
-result<void> converter<int8_t>::push_to_lua(lua_State* lua, int8_t v)
+inline result<void> converter<int8_t>::push_to_lua(lua_State* lua, int8_t v)
 {
     lua_pushinteger(lua, static_cast<lua_Integer>(v));
     return {};
 }
 
-result<int8_t> converter<int8_t>::from_lua(lua_State* lua, int i)
+inline result<int8_t> converter<int8_t>::from_lua(lua_State* lua, int i)
 {
     return static_cast<int8_t>(lua_tointeger(lua, i));
 }
 
-result<void> converter<uint8_t>::push_to_lua(lua_State* lua, uint8_t v)
+inline result<void> converter<uint8_t>::push_to_lua(lua_State* lua, uint8_t v)
 {
     lua_pushinteger(lua, static_cast<lua_Integer>(v));
     return {};
 }
 
-result<uint8_t> converter<uint8_t>::from_lua(lua_State* lua, int i)
+inline result<uint8_t> converter<uint8_t>::from_lua(lua_State* lua, int i)
 {
     return static_cast<uint8_t>(lua_tointeger(lua, i));
 }
 
-result<void> converter<int16_t>::push_to_lua(lua_State* lua, int16_t v)
+inline result<void> converter<int16_t>::push_to_lua(lua_State* lua, int16_t v)
 {
     lua_pushinteger(lua, static_cast<lua_Integer>(v));
     return {};
 }
 
-result<int16_t> converter<int16_t>::from_lua(lua_State* lua, int i)
+inline result<int16_t> converter<int16_t>::from_lua(lua_State* lua, int i)
 {
     return static_cast<int16_t>(lua_tointeger(lua, i));
 }
 
-result<void> converter<uint16_t>::push_to_lua(lua_State* lua, uint16_t v)
+inline result<void> converter<uint16_t>::push_to_lua(lua_State* lua, uint16_t v)
 {
     lua_pushinteger(lua, static_cast<lua_Integer>(v));
     return {};
 }
 
-result<uint16_t> converter<uint16_t>::from_lua(lua_State* lua, int i)
+inline result<uint16_t> converter<uint16_t>::from_lua(lua_State* lua, int i)
 {
     return static_cast<uint16_t>(lua_tointeger(lua, i));
 }
 
-result<void> converter<int32_t>::push_to_lua(lua_State* lua, int32_t v)
+inline result<void> converter<int32_t>::push_to_lua(lua_State* lua, int32_t v)
 {
     lua_pushinteger(lua, static_cast<lua_Integer>(v));
     return {};
 }
 
-result<int32_t> converter<int32_t>::from_lua(lua_State* lua, int i)
+inline result<int32_t> converter<int32_t>::from_lua(lua_State* lua, int i)
 {
     return static_cast<int32_t>(lua_tointeger(lua, i));
 }
 
-result<void> converter<uint32_t>::push_to_lua(lua_State* lua, uint32_t v)
+inline result<void> converter<uint32_t>::push_to_lua(lua_State* lua, uint32_t v)
 {
     lua_pushinteger(lua, static_cast<lua_Integer>(v));
     return {};
 }
 
-result<uint32_t> converter<uint32_t>::from_lua(lua_State* lua, int i)
+inline result<uint32_t> converter<uint32_t>::from_lua(lua_State* lua, int i)
 {
     return static_cast<uint32_t>(lua_tointeger(lua, i));
 }
 
-result<void> converter<int64_t>::push_to_lua(lua_State* lua, int64_t v)
+inline result<void> converter<int64_t>::push_to_lua(lua_State* lua, int64_t v)
 {
     lua_pushinteger(lua, static_cast<lua_Integer>(v));
     return {};
 }
 
-result<int64_t> converter<int64_t>::from_lua(lua_State* lua, int i)
+inline result<int64_t> converter<int64_t>::from_lua(lua_State* lua, int i)
 {
     return static_cast<int64_t>(lua_tointeger(lua, i));
 }
 
-result<void> converter<uint64_t>::push_to_lua(lua_State* lua, uint64_t v)
+inline result<void> converter<uint64_t>::push_to_lua(lua_State* lua, uint64_t v)
 {
     lua_pushinteger(lua, static_cast<lua_Integer>(v));
     return {};
 }
 
-result<uint64_t> converter<uint64_t>::from_lua(lua_State* lua, int i)
+inline result<uint64_t> converter<uint64_t>::from_lua(lua_State* lua, int i)
 {
     return static_cast<uint64_t>(lua_tointeger(lua, i));
 }
 
-result<void> converter<float>::push_to_lua(lua_State* lua, float v)
+inline result<void> converter<float>::push_to_lua(lua_State* lua, float v)
 {
     lua_pushnumber(lua, static_cast<lua_Number>(v));
     return {};
 }
 
-result<float> converter<float>::from_lua(lua_State* lua, int i)
+inline result<float> converter<float>::from_lua(lua_State* lua, int i)
 {
     return static_cast<float>(lua_tonumber(lua, i));
 }
 
-result<void> converter<double>::push_to_lua(lua_State* lua, double v)
+inline result<void> converter<double>::push_to_lua(lua_State* lua, double v)
 {
     lua_pushnumber(lua, static_cast<lua_Number>(v));
     return {};
 }
 
-result<double> converter<double>::from_lua(lua_State* lua, int i)
+inline result<double> converter<double>::from_lua(lua_State* lua, int i)
 {
     return static_cast<double>(lua_tonumber(lua, i));
 }
 
-result<void> converter<bool>::push_to_lua(lua_State* lua, bool v)
+inline result<void> converter<bool>::push_to_lua(lua_State* lua, bool v)
 {
     lua_pushboolean(lua, static_cast<int>(v));
     return {};
 }
 
-result<bool> converter<bool>::from_lua(lua_State* lua, int i)
+inline result<bool> converter<bool>::from_lua(lua_State* lua, int i)
 {
     return lua_toboolean(lua, i) != 0;
 }
@@ -387,7 +387,7 @@ result<std::reference_wrapper<const T>> converter<std::reference_wrapper<const T
     return class_registration_impl<T>::unwrap_object_const(lua, i).transform([](const T* ptr) { return std::cref(*ptr); });
 }
 
-result<void> converter<any>::push_to_lua(lua_State* lua, any&& v)
+inline result<void> converter<any>::push_to_lua(lua_State* lua, any&& v)
 {
     auto* lua_any = dynamic_cast<any_lua_impl*>(v.impl_.get());
     if (lua_any) {
@@ -397,7 +397,7 @@ result<void> converter<any>::push_to_lua(lua_State* lua, any&& v)
     }
 }
 
-result<any> converter<any>::from_lua(lua_State* lua, int i)
+inline result<any> converter<any>::from_lua(lua_State* lua, int i)
 {
     auto absolute_index = make_absolute(lua, i);
     auto type = lua_type(lua, absolute_index);
@@ -481,7 +481,7 @@ result<void> many_push_to_lua(lua_State* lua, T&& value, Ts&&... values)
     });
 }
 
-result<void> many_push_to_lua(lua_State*) { return {}; }
+inline result<void> many_push_to_lua(lua_State*) { return {}; }
 
 template <typename... Ts>
 auto many_from_lua([[maybe_unused]] lua_State* lua, IndexFor<Ts>... vs)

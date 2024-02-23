@@ -4,7 +4,7 @@
 // crafted to separate declarations and dependent definitions
 
 namespace glua::lua {
-int make_absolute(lua_State* lua, int i)
+inline int make_absolute(lua_State* lua, int i)
 {
     if (i < 0) {
         // -1 would be top, so subtract one fewer

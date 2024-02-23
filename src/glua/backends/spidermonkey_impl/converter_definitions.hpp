@@ -38,14 +38,14 @@ result<JS::Value> converter<T>::to_js(JSContext* cx, T v)
     return converter<std::decay_t<T>>::to_js(cx, v);
 }
 
-result<JS::Value> converter<int8_t>::to_js(JSContext*, int8_t v)
+inline result<JS::Value> converter<int8_t>::to_js(JSContext*, int8_t v)
 {
     JS::Value result;
     result.setNumber(v);
     return result;
 }
 
-result<int8_t> converter<int8_t>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<int8_t> converter<int8_t>::from_js(JSContext* cx, JS::HandleValue v)
 {
     int8_t retval;
     JS::ToInt8(cx, v, &retval);
@@ -53,14 +53,14 @@ result<int8_t> converter<int8_t>::from_js(JSContext* cx, JS::HandleValue v)
     return retval;
 }
 
-result<JS::Value> converter<uint8_t>::to_js(JSContext*, uint8_t v)
+inline result<JS::Value> converter<uint8_t>::to_js(JSContext*, uint8_t v)
 {
     JS::Value result;
     result.setNumber(v);
     return result;
 }
 
-result<uint8_t> converter<uint8_t>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<uint8_t> converter<uint8_t>::from_js(JSContext* cx, JS::HandleValue v)
 {
     uint8_t retval;
     JS::ToUint8(cx, v, &retval);
@@ -68,14 +68,14 @@ result<uint8_t> converter<uint8_t>::from_js(JSContext* cx, JS::HandleValue v)
     return retval;
 }
 
-result<JS::Value> converter<int16_t>::to_js(JSContext*, int16_t v)
+inline result<JS::Value> converter<int16_t>::to_js(JSContext*, int16_t v)
 {
     JS::Value result;
     result.setNumber(v);
     return result;
 }
 
-result<int16_t> converter<int16_t>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<int16_t> converter<int16_t>::from_js(JSContext* cx, JS::HandleValue v)
 {
     int16_t retval;
     JS::ToInt16(cx, v, &retval);
@@ -83,14 +83,14 @@ result<int16_t> converter<int16_t>::from_js(JSContext* cx, JS::HandleValue v)
     return retval;
 }
 
-result<JS::Value> converter<uint16_t>::to_js(JSContext*, uint16_t v)
+inline result<JS::Value> converter<uint16_t>::to_js(JSContext*, uint16_t v)
 {
     JS::Value result;
     result.setNumber(v);
     return result;
 }
 
-result<uint16_t> converter<uint16_t>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<uint16_t> converter<uint16_t>::from_js(JSContext* cx, JS::HandleValue v)
 {
     uint16_t retval;
     JS::ToUint16(cx, v, &retval);
@@ -98,9 +98,9 @@ result<uint16_t> converter<uint16_t>::from_js(JSContext* cx, JS::HandleValue v)
     return retval;
 }
 
-result<JS::Value> converter<int32_t>::to_js(JSContext*, int32_t v) { return JS::Int32Value(v); }
+inline result<JS::Value> converter<int32_t>::to_js(JSContext*, int32_t v) { return JS::Int32Value(v); }
 
-result<int32_t> converter<int32_t>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<int32_t> converter<int32_t>::from_js(JSContext* cx, JS::HandleValue v)
 {
     int32_t retval;
     JS::ToInt32(cx, v, &retval);
@@ -108,14 +108,14 @@ result<int32_t> converter<int32_t>::from_js(JSContext* cx, JS::HandleValue v)
     return retval;
 }
 
-result<JS::Value> converter<uint32_t>::to_js(JSContext*, uint32_t v)
+inline result<JS::Value> converter<uint32_t>::to_js(JSContext*, uint32_t v)
 {
     JS::Value result;
     result.setNumber(v);
     return result;
 }
 
-result<uint32_t> converter<uint32_t>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<uint32_t> converter<uint32_t>::from_js(JSContext* cx, JS::HandleValue v)
 {
     uint32_t retval;
     JS::ToUint32(cx, v, &retval);
@@ -123,14 +123,14 @@ result<uint32_t> converter<uint32_t>::from_js(JSContext* cx, JS::HandleValue v)
     return retval;
 }
 
-result<JS::Value> converter<int64_t>::to_js(JSContext*, int64_t v)
+inline result<JS::Value> converter<int64_t>::to_js(JSContext*, int64_t v)
 {
     JS::Value result;
     result.setNumber(v);
     return result;
 }
 
-result<int64_t> converter<int64_t>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<int64_t> converter<int64_t>::from_js(JSContext* cx, JS::HandleValue v)
 {
     int64_t retval;
     JS::ToInt64(cx, v, &retval);
@@ -138,14 +138,14 @@ result<int64_t> converter<int64_t>::from_js(JSContext* cx, JS::HandleValue v)
     return retval;
 }
 
-result<JS::Value> converter<uint64_t>::to_js(JSContext*, uint64_t v)
+inline result<JS::Value> converter<uint64_t>::to_js(JSContext*, uint64_t v)
 {
     JS::Value result;
     result.setNumber(v);
     return result;
 }
 
-result<uint64_t> converter<uint64_t>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<uint64_t> converter<uint64_t>::from_js(JSContext* cx, JS::HandleValue v)
 {
     uint64_t retval;
     JS::ToUint64(cx, v, &retval);
@@ -153,9 +153,9 @@ result<uint64_t> converter<uint64_t>::from_js(JSContext* cx, JS::HandleValue v)
     return retval;
 }
 
-result<JS::Value> converter<float>::to_js(JSContext*, float v) { return JS::Float32Value(v); }
+inline result<JS::Value> converter<float>::to_js(JSContext*, float v) { return JS::Float32Value(v); }
 
-result<float> converter<float>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<float> converter<float>::from_js(JSContext* cx, JS::HandleValue v)
 {
     double retval;
     JS::ToNumber(cx, v, &retval);
@@ -163,9 +163,9 @@ result<float> converter<float>::from_js(JSContext* cx, JS::HandleValue v)
     return static_cast<float>(retval);
 }
 
-result<JS::Value> converter<double>::to_js(JSContext*, double v) { return JS::DoubleValue(v); }
+inline result<JS::Value> converter<double>::to_js(JSContext*, double v) { return JS::DoubleValue(v); }
 
-result<double> converter<double>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<double> converter<double>::from_js(JSContext* cx, JS::HandleValue v)
 {
     double retval;
     JS::ToNumber(cx, v, &retval);
@@ -173,9 +173,9 @@ result<double> converter<double>::from_js(JSContext* cx, JS::HandleValue v)
     return retval;
 }
 
-result<JS::Value> converter<bool>::to_js(JSContext*, bool v) { return JS::BooleanValue(v); }
+inline result<JS::Value> converter<bool>::to_js(JSContext*, bool v) { return JS::BooleanValue(v); }
 
-result<bool> converter<bool>::from_js(JSContext*, JS::HandleValue v) { return JS::ToBoolean(v); }
+inline result<bool> converter<bool>::from_js(JSContext*, JS::HandleValue v) { return JS::ToBoolean(v); }
 
 template <registered_class T>
 result<JS::Value> converter<T*>::to_js(JSContext* cx, T* v)
@@ -408,7 +408,7 @@ result<std::unordered_map<std::string, T>> converter<std::unordered_map<std::str
     }
 }
 
-result<JS::Value> converter<any>::to_js(JSContext* cx, any&& v)
+inline result<JS::Value> converter<any>::to_js(JSContext* cx, any&& v)
 {
     auto* spidermonkey_any = dynamic_cast<any_spidermonkey_impl*>(v.impl_.get());
     if (spidermonkey_any) {
@@ -418,7 +418,7 @@ result<JS::Value> converter<any>::to_js(JSContext* cx, any&& v)
     }
 }
 
-result<any> converter<any>::from_js(JSContext* cx, JS::HandleValue v)
+inline result<any> converter<any>::from_js(JSContext* cx, JS::HandleValue v)
 {
     // have to figure out what v really is and build the correct representation
     return [&]() -> result<std::unique_ptr<any_impl>> {
