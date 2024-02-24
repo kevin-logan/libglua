@@ -38,6 +38,16 @@ struct converter<T> {
     // from_lua not supported, can't 'point' to script bytes
 };
 
+template <decays_to<const char*> T>
+struct converter<T> {
+    static result<void> push_to_lua(lua_State* lua, const char* v);
+
+    // from_lua not supported, can't 'point' to script bytes
+};
+
+template <decays_to<char*> T>
+struct converter<T> : converter<const char*> { };
+
 template <typename T>
 struct converter<std::vector<T>> {
     static result<void> push_to_lua(lua_State* lua, std::vector<T>&& v);
@@ -208,10 +218,13 @@ struct converter<std::reference_wrapper<const T>> {
 
 template <>
 struct converter<any> {
-    static result<void> push_to_lua(lua_State* lua, any&& v);
+    static result<void> push_to_lua(lua_State* lua, const any& v);
 
     static result<any> from_lua(lua_State* lua, int i);
 };
+
+template <decays_to<any> T>
+struct converter<T> : converter<std::decay_t<T>> { };
 
 template <typename T, typename... Ts>
 result<void> many_push_to_lua(lua_State* lua, T&& value, Ts&&... values);

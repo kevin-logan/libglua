@@ -14,11 +14,11 @@ extern "C" {
 
 #include "lua_impl/converter_declarations.hpp"
 
-// depends on conversions
-#include "lua_impl/class_registration_impl.hpp"
-
-// any implementations depend on converter declarations and class_registration_impl
+// any implementations depend on converter declarations
 #include "lua_impl/any.hpp"
+
+// depends on conversions and any
+#include "lua_impl/class_registration_impl.hpp"
 
 // depends on class registration
 #include "lua_impl/converter_definitions.hpp"
@@ -33,6 +33,35 @@ public:
     static result<std::unique_ptr<backend>> create(bool start_sandboxed = true)
     {
         return std::unique_ptr<backend>(new backend { start_sandboxed });
+    }
+
+    struct sandbox {
+        std::string env_name_;
+        std::string env__index_name_;
+    };
+
+    result<sandbox> create_sandbox()
+    {
+        static std::size_t counter { 0 };
+        ++counter;
+        sandbox s {
+            std::format("__glua_env_user_{}", counter),
+            std::format("__glua_env__index_user_{}", counter)
+        };
+
+        // even if the pointer changes this doesn't matter, we just use the string names
+        // not any actual pointer values
+        build_sandbox(true, &s);
+
+        return s;
+    }
+    void set_active_sandbox(sandbox* s)
+    {
+        if (s == nullptr) {
+            current_sandbox_ = &default_sandbox_;
+        } else {
+            current_sandbox_ = s;
+        }
     }
 
     template <typename ReturnType>
@@ -90,7 +119,7 @@ public:
 
         lua_gettable(lua_, -2);
 
-        auto result = from_lua<T>(lua_, -2);
+        auto result = from_lua<T>(lua_, -1);
         lua_pop(lua_, 2); // pop value and env off stack
 
         return result;
@@ -160,12 +189,12 @@ public:
 
     void push_env()
     {
-        lua_getglobal(lua_, env_name);
+        lua_getglobal(lua_, current_sandbox_->env_name_.data());
     }
 
     void push_env__index()
     {
-        lua_getglobal(lua_, env__index_name);
+        lua_getglobal(lua_, current_sandbox_->env__index_name_.data());
     }
 
     ~backend()
@@ -176,23 +205,15 @@ public:
 private:
     backend(bool start_sandboxed)
         : lua_(luaL_newstate())
+        , default_sandbox_ { "__glua_env", "__glua_env__index" }
+        , current_sandbox_(&default_sandbox_)
     {
         luaL_openlibs(lua_);
 
-        build_sandbox(start_sandboxed);
-
-        // let's create the env table
-        lua_newtable(lua_); // env
-        lua_pushvalue(lua_, -1); // env, env
-        lua_pushliteral(lua_, "__index"); // env, env, __index
-        push_env__index(); // env, env, __index, env__index
-        lua_settable(lua_, -3); // env, env
-        lua_setmetatable(lua_, -2); // env
-
-        lua_setglobal(lua_, env_name); // empty stack
+        build_sandbox(start_sandboxed, current_sandbox_);
     }
 
-    void build_sandbox(bool start_sandboxed)
+    void build_sandbox(bool start_sandboxed, sandbox* s)
     {
         if (start_sandboxed) {
             // lookup the global for each of these and push them onto env
@@ -233,20 +254,32 @@ private:
                 lua_settable(lua_, -3); // env__index
             }
 
-            lua_setglobal(lua_, env__index_name); // stack now back to start
+            lua_setglobal(lua_, s->env__index_name_.data()); // stack now back to start
         } else {
             // when not using a sandbox:
             //   env.__index -> _G
             // where _G is the default lua globals table
             lua_getglobal(lua_, "_G");
-            lua_setglobal(lua_, env__index_name);
+            lua_setglobal(lua_, s->env__index_name_.data());
         }
+
+        // let's create the env table
+        lua_newtable(lua_); // env
+        lua_pushvalue(lua_, -1); // env, env
+        lua_pushliteral(lua_, "__index"); // env, env, __index
+        push_env__index(); // env, env, __index, env__index
+        lua_settable(lua_, -3); // env, env
+        lua_setmetatable(lua_, -2); // env
+
+        lua_setglobal(lua_, s->env_name_.data()); // empty stack
     }
 
-    static constexpr char env_name[] = "__glua_env";
-    static constexpr char env__index_name[] = "__glua_env__index";
+    // static constexpr char env_name[] = "__glua_env";
+    // static constexpr char env__index_name[] = "__glua_env__index";
 
     lua_State* lua_;
+    sandbox default_sandbox_;
+    sandbox* current_sandbox_;
 };
 
 } // namespace glua::lua

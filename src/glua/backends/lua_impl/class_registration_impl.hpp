@@ -5,32 +5,73 @@
 
 namespace glua::lua {
 
+struct class_registration_data;
+using class_registration_data_ptr = std::shared_ptr<class_registration_data>;
+
 using registered_class_finalizer = void (*)(void*);
+using to_any = std::unique_ptr<any_impl> (*)(class_registration_data_ptr*);
+
 struct class_registration_data {
-    class_registration_data(void* ptr, bool owned_by_lua, bool is_mutable, registered_class_finalizer finalizer, const char* registration_name)
+    class_registration_data(void* ptr, bool owned_by_lua, bool is_mutable, to_any make_any, registered_class_finalizer finalizer)
         : ptr_(ptr)
         , owned_by_lua_(owned_by_lua)
         , mutable_(is_mutable)
+        , make_any_(make_any)
         , finalizer_(finalizer)
-        , registration_name_(registration_name)
     {
+    }
+
+    ~class_registration_data()
+    {
+        // this class is stored in a shared_ptr, when it finally destroys we may own the underlying data and need to destroy that
+        if (owned_by_lua_)
+            finalizer_(ptr_);
     }
 
     void* ptr_;
     bool owned_by_lua_;
     bool mutable_;
+    to_any make_any_;
     registered_class_finalizer finalizer_;
-    const char* registration_name_;
 };
 
 template <registered_class T>
 struct class_registration_impl {
     using registration = class_registration<T>;
 
+    // definition before any conversions
+    static std::unique_ptr<any_impl> make_any(class_registration_data_ptr* obj)
+    {
+        struct any_registered_class_impl : any_lua_impl {
+            any_registered_class_impl(class_registration_data_ptr value)
+                : value_(std::move(value))
+            {
+            }
+
+            result<void> push_to_lua(lua_State* lua) const override
+            {
+                auto* data = static_cast<class_registration_data_ptr*>(lua_newuserdata(lua, sizeof(class_registration_data_ptr)));
+
+                // placement new needs with a a copy of the original shared_ptr
+                new (data) class_registration_data_ptr { value_ };
+
+                // set the metatable for this object
+                luaL_getmetatable(lua, registration::name.data());
+                lua_setmetatable(lua, -2);
+
+                return {};
+            }
+
+            class_registration_data_ptr value_;
+        };
+
+        return std::make_unique<any_registered_class_impl>(*obj); // copy shared ownership here
+    }
+
     static result<T*> unwrap_object(lua_State* lua, int i)
     {
         if (lua_isuserdata(lua, i)) {
-            auto* data = static_cast<class_registration_data*>(lua_touserdata(lua, i));
+            auto* data = static_cast<class_registration_data_ptr*>(lua_touserdata(lua, i))->get();
             if (data->mutable_) {
                 return static_cast<T*>(data->ptr_);
             } else {
@@ -44,7 +85,7 @@ struct class_registration_impl {
     static result<const T*> unwrap_object_const(lua_State* lua, int i)
     {
         if (lua_isuserdata(lua, i)) {
-            auto* data = static_cast<class_registration_data*>(lua_touserdata(lua, i));
+            auto* data = static_cast<class_registration_data_ptr*>(lua_touserdata(lua, i))->get();
             return static_cast<const T*>(data->ptr_);
         } else {
             return unexpected("unwrap on non-object value");
@@ -53,8 +94,8 @@ struct class_registration_impl {
 
     static result<void> push_wrapped_object(lua_State* lua, T* obj_ptr, bool owned_by_lua = false)
     {
-        class_registration_data* data = static_cast<class_registration_data*>(lua_newuserdata(lua, sizeof(class_registration_data)));
-        new (data) class_registration_data { obj_ptr, owned_by_lua, true, destructor_vp, registration::name.data() };
+        auto* data = static_cast<class_registration_data_ptr*>(lua_newuserdata(lua, sizeof(class_registration_data_ptr)));
+        new (data) class_registration_data_ptr { std::make_shared<class_registration_data>(obj_ptr, owned_by_lua, true, make_any, destructor_vp) };
 
         // set the metatable for this object
         luaL_getmetatable(lua, registration::name.data());
@@ -70,11 +111,11 @@ struct class_registration_impl {
 
     static result<void> push_wrapped_object(lua_State* lua, const T* obj_ptr, bool owned_by_lua = false)
     {
-        class_registration_data* data = static_cast<class_registration_data*>(lua_newuserdata(lua, sizeof(class_registration_data)));
+        auto* data = static_cast<class_registration_data_ptr*>(lua_newuserdata(lua, sizeof(class_registration_data_ptr)));
 
         // const_cast here is obviously a const violation, it means at runtime we're now responsible
         // for const checking
-        new (data) class_registration_data { const_cast<T*>(obj_ptr), owned_by_lua, false, destructor_vp, registration::name.data() };
+        new (data) class_registration_data_ptr { std::make_shared<class_registration_data>(const_cast<T*>(obj_ptr), owned_by_lua, false, make_any, destructor_vp) };
 
         // set the metatable for this object
         luaL_getmetatable(lua, registration::name.data());
@@ -95,14 +136,10 @@ struct class_registration_impl {
 
     static int destructor(lua_State* lua)
     {
-        auto* data = static_cast<class_registration_data*>(lua_touserdata(lua, 1));
-        if (data->owned_by_lua_) {
-            // reacquire and destruct
-            auto owned = std::unique_ptr<T>(static_cast<T*>(data->ptr_));
-        }
+        auto* data = static_cast<class_registration_data_ptr*>(lua_touserdata(lua, 1));
 
         // then we need to destroy the data
-        std::destroy_at(data);
+        std::destroy_at(data); // destroy shared pointer, may or may not actually own
 
         return 0;
     }

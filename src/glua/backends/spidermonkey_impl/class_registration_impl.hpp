@@ -5,27 +5,79 @@
 
 namespace glua::spidermonkey {
 constexpr std::size_t SLOT_OBJECT_PTR { 0 };
-constexpr std::size_t SLOT_VALUE_OWNED_BY_JS { 1 };
-constexpr std::size_t SLOT_VALUE_MUTABLE { 2 };
+constexpr std::size_t SLOT_COUNT { 1 };
+
+struct class_registration_data;
+using class_registration_data_ptr = std::shared_ptr<class_registration_data>;
+
 using registered_class_finalizer = void (*)(void*);
-constexpr std::size_t SLOT_FINALIZER { 3 };
-constexpr std::size_t SLOT_COUNT { 4 };
+using to_any = std::unique_ptr<any_impl> (*)(class_registration_data_ptr*);
+
+struct class_registration_data {
+    class_registration_data(void* ptr, bool owned_by_js, bool is_mutable, to_any make_any, registered_class_finalizer f)
+        : ptr_(ptr)
+        , owned_by_js_(owned_by_js)
+        , mutable_(is_mutable)
+        , make_any_(make_any)
+        , finalizer_(f)
+    {
+    }
+
+    ~class_registration_data()
+    {
+        // this class is stored in a shared_ptr, when it finally destroys we may own the underlying data and need to destroy that
+        if (owned_by_js_)
+            finalizer_(ptr_);
+    }
+
+    void* ptr_;
+    bool owned_by_js_;
+    bool mutable_;
+    to_any make_any_;
+    registered_class_finalizer finalizer_;
+};
 
 template <registered_class T>
 struct class_registration_impl {
     using registration = class_registration<T>;
 
+    static std::unique_ptr<any_impl> make_any(class_registration_data_ptr* obj)
+    {
+        struct any_registered_class_impl : any_spidermonkey_impl {
+            any_registered_class_impl(class_registration_data_ptr value)
+                : value_(std::move(value))
+            {
+            }
+
+            result<JS::Value> to_js(JSContext* cx) const override
+            {
+                JS::RootedObject obj { cx, JS_NewObjectWithGivenProto(cx, &class_, proto_) };
+
+                // new shared_ptr*, copying existing shared_ptr
+                auto* wrapper_ptr = new class_registration_data_ptr { value_ };
+
+                JS::SetReservedSlot(obj, SLOT_OBJECT_PTR, JS::PrivateValue(wrapper_ptr));
+
+                return JS::ObjectValue(*obj);
+            }
+
+            class_registration_data_ptr value_;
+        };
+
+        return std::make_unique<any_registered_class_impl>(*obj); // copy shared ownership here
+    }
+
     static result<T*> unwrap_object(JSContext*, JS::HandleValue v)
     {
         if (v.isObject()) {
             JSObject& obj = v.toObject();
-            const JS::Value& reserved_value = JS::GetReservedSlot(&obj, SLOT_VALUE_MUTABLE);
-            if (reserved_value.toBoolean()) {
-                const JS::Value& reserved_value = JS::GetReservedSlot(&obj, SLOT_OBJECT_PTR);
-                return reinterpret_cast<T*>(reserved_value.toPrivate());
-            } else {
+            const JS::Value& reserved_value = JS::GetReservedSlot(&obj, SLOT_OBJECT_PTR);
+            auto* data = reinterpret_cast<class_registration_data_ptr*>(reserved_value.toPrivate())->get();
+
+            if (data->mutable_)
+                return reinterpret_cast<T*>(data->ptr_);
+            else
                 return unexpected("unwrap failed - attempted to extract mutable reference to const object");
-            }
         } else {
             return unexpected("unwrap on non-object value");
         }
@@ -36,7 +88,8 @@ struct class_registration_impl {
         if (v.isObject()) {
             JSObject& obj = v.toObject();
             const JS::Value& reserved_value = JS::GetReservedSlot(&obj, SLOT_OBJECT_PTR);
-            return reinterpret_cast<T*>(reserved_value.toPrivate());
+            auto* data = reinterpret_cast<class_registration_data_ptr*>(reserved_value.toPrivate())->get();
+            return reinterpret_cast<T*>(data->ptr_);
         } else {
             return unexpected("unwrap (const) on non-object value");
         }
@@ -46,10 +99,11 @@ struct class_registration_impl {
     {
         JS::RootedObject obj { cx, JS_NewObjectWithGivenProto(cx, &class_, proto_) };
 
-        JS::SetReservedSlot(obj, SLOT_OBJECT_PTR, JS::PrivateValue(obj_ptr)); // release v here
-        JS::SetReservedSlot(obj, SLOT_VALUE_OWNED_BY_JS, JS::BooleanValue(owned_by_js)); // whether owned in JS
-        JS::SetReservedSlot(obj, SLOT_VALUE_MUTABLE, JS::BooleanValue(true)); // whether the value is mutable
-        JS::SetReservedSlot(obj, SLOT_FINALIZER, JS::PrivateValue(reinterpret_cast<void*>(finalizer_vp))); // finalizer for if we lose type information (such as in any destructor)
+        auto* wrapper_ptr = new class_registration_data_ptr {
+            std::make_shared<class_registration_data>(obj_ptr, owned_by_js, true, make_any, finalizer_vp)
+        };
+
+        JS::SetReservedSlot(obj, SLOT_OBJECT_PTR, JS::PrivateValue(wrapper_ptr));
 
         return obj;
     }
@@ -70,10 +124,11 @@ struct class_registration_impl {
 
         // const_cast here is obviously a const violation, it means at runtime we're now responsible
         // for const checking
-        JS::SetReservedSlot(obj, SLOT_OBJECT_PTR, JS::PrivateValue(const_cast<T*>(obj_ptr))); // release v here
-        JS::SetReservedSlot(obj, SLOT_VALUE_OWNED_BY_JS, JS::BooleanValue(owned_by_js)); // whether owned in JS
-        JS::SetReservedSlot(obj, SLOT_VALUE_MUTABLE, JS::BooleanValue(false)); // whether the value is mutable
-        JS::SetReservedSlot(obj, SLOT_FINALIZER, JS::PrivateValue(reinterpret_cast<void*>(finalizer_vp))); // finalizer for if we lose type information (such as in any destructor)
+        auto* wrapper_ptr = new class_registration_data_ptr {
+            std::make_shared<class_registration_data>(const_cast<T*>(obj_ptr), owned_by_js, false, make_any, finalizer_vp)
+        };
+
+        JS::SetReservedSlot(obj, SLOT_OBJECT_PTR, JS::PrivateValue(wrapper_ptr));
 
         return obj;
     }
@@ -86,12 +141,13 @@ struct class_registration_impl {
 
     static void finalizer(JS::GCContext*, JSObject* obj)
     {
-        const JS::Value& reserved_value_ptr = JS::GetReservedSlot(obj, SLOT_OBJECT_PTR);
-        const JS::Value& reserved_value_owned = JS::GetReservedSlot(obj, SLOT_VALUE_OWNED_BY_JS);
+        const JS::Value& reserved_value = JS::GetReservedSlot(obj, SLOT_OBJECT_PTR);
+        auto* data = reinterpret_cast<class_registration_data_ptr*>(reserved_value.toPrivate());
 
-        if (reserved_value_owned.toBoolean()) {
-            std::unique_ptr<T> reacquired_ptr { reinterpret_cast<T*>(reserved_value_ptr.toPrivate()) };
-        }
+        // this deletes the shared_ptr<class_registration_data>, which may or may not delete
+        // the actual T* within, depending on owned_by_js_ value
+        // NOTE: data may be nullptr (in the case of the proto_ object)
+        delete data;
     }
 
     static void finalizer_vp(void* data_ptr)
@@ -201,9 +257,15 @@ struct class_registration_impl {
                 nullptr, // static propertyspec
                 nullptr // static functionspec
                 ));
+        // proto will eventually be collected, and the finalizer will be called, so we must
+        // set the slot to nullptr so the finalizer does nothing
+        JS::SetReservedSlot(proto_, SLOT_OBJECT_PTR, JS::PrivateValue(nullptr));
     }
 
-    static void do_deregistration() { proto_.reset(); }
+    static void do_deregistration()
+    {
+        proto_.reset();
+    }
 
     using methods_tuple = decltype(registration::methods);
     static constexpr std::size_t num_methods = std::tuple_size_v<methods_tuple>;

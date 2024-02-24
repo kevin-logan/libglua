@@ -26,6 +26,13 @@ result<JS::Value> converter<T>::to_js(JSContext* cx, std::string_view v)
     return JS::StringValue(JS_NewStringCopyN(cx, v.data(), v.size()));
 }
 
+template <decays_to<const char*> T>
+result<JS::Value> converter<T>::to_js(JSContext* cx, const char* v)
+{
+    std::string_view view { v };
+    return JS::StringValue(JS_NewStringCopyN(cx, view.data(), view.size()));
+}
+
 template <decays_to_vector T>
 result<JS::Value> converter<T>::to_js(JSContext* cx, T v)
 {
@@ -408,11 +415,11 @@ result<std::unordered_map<std::string, T>> converter<std::unordered_map<std::str
     }
 }
 
-inline result<JS::Value> converter<any>::to_js(JSContext* cx, any&& v)
+inline result<JS::Value> converter<any>::to_js(JSContext* cx, const any& v)
 {
     auto* spidermonkey_any = dynamic_cast<any_spidermonkey_impl*>(v.impl_.get());
     if (spidermonkey_any) {
-        return std::move(*spidermonkey_any).to_js(cx);
+        return spidermonkey_any->to_js(cx);
     } else {
         return unexpected("Received invalid any, perhaps from another backend");
     }
@@ -448,14 +455,10 @@ inline result<any> converter<any>::from_js(JSContext* cx, JS::HandleValue v)
             bool is_array { false };
 
             if (JSCLASS_RESERVED_SLOTS(c) == SLOT_COUNT) {
-                // if it has our SLOT_COUNT it's a registered_class
-                JS::RootedObject obj_handle { cx, &obj };
-                JS::RootedObject proto_handle { cx };
-                if (JS_GetPrototype(cx, obj_handle, JS::MutableHandleObject(&proto_handle))) {
-                    return [&]() -> std::unique_ptr<any_impl> { return std::make_unique<any_registered_class_impl>(obj_handle, proto_handle); }();
-                } else {
-                    return unexpected("Could not retrieve any object prototype");
-                }
+                // if it has our SLOT_COUNT it's (probably) a registered_class
+                const JS::Value& reserved_value = JS::GetReservedSlot(&obj, SLOT_OBJECT_PTR);
+                auto* data = reinterpret_cast<class_registration_data_ptr*>(reserved_value.toPrivate());
+                return data->get()->make_any_(data);
             } else if (JS::IsArrayObject(cx, v, &is_array) && is_array) {
                 return spidermonkey::from_js<std::vector<any>>(cx, v).transform([&](auto value) -> std::unique_ptr<any_impl> {
                     return std::make_unique<any_array_impl<any>>(std::move(value));

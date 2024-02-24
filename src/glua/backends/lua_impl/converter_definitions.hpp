@@ -31,6 +31,13 @@ result<void> converter<T>::push_to_lua(lua_State* lua, std::string_view v)
     return {};
 }
 
+template <decays_to<const char*> T>
+result<void> converter<T>::push_to_lua(lua_State* lua, const char* v)
+{
+    lua_pushstring(lua, v);
+    return {};
+}
+
 template <typename T>
 result<void> converter<std::vector<T>>::push_to_lua(lua_State* lua, std::vector<T>&& v)
 {
@@ -387,11 +394,11 @@ result<std::reference_wrapper<const T>> converter<std::reference_wrapper<const T
     return class_registration_impl<T>::unwrap_object_const(lua, i).transform([](const T* ptr) { return std::cref(*ptr); });
 }
 
-inline result<void> converter<any>::push_to_lua(lua_State* lua, any&& v)
+inline result<void> converter<any>::push_to_lua(lua_State* lua, const any& v)
 {
     auto* lua_any = dynamic_cast<any_lua_impl*>(v.impl_.get());
     if (lua_any) {
-        return std::move(*lua_any).push_to_lua(lua);
+        return lua_any->push_to_lua(lua);
     } else {
         return unexpected("Received invalid any, perhaps from another backend");
     }
@@ -449,8 +456,8 @@ inline result<any> converter<any>::from_lua(lua_State* lua, int i)
         }
         case LUA_TUSERDATA: {
             // registered_class
-            auto* data = static_cast<class_registration_data*>(lua_touserdata(lua, absolute_index));
-            return [&]() -> std::unique_ptr<any_impl> { return std::make_unique<any_registered_class_impl>(data); }();
+            auto* data = static_cast<class_registration_data_ptr*>(lua_touserdata(lua, absolute_index));
+            return data->get()->make_any_(data);
         }
         }
         return unexpected("Cannot create any from invalid typed lua item");

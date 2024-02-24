@@ -110,9 +110,10 @@ glua::result<void> advanced_test_glua_instance(glua::instance<Backend>& glue)
                 format_print("\t{}: {}\n", k, "<any>");
             }
 
-            // 'any' objects are move-only, and as such we must also move any container that holds any objects
-            // as they are one-and-done. They rob ownership from their JS source and always return it when used
-            return glue.template call_function<void>("print_weights", std::move(weights));
+            return glue.template call_function<void>("print_weights", weights).and_then([&]() {
+                // demonstrate using an any more than once
+                return glue.template call_function<void>("print_weights", weights);
+            });
         })
         .and_then([&]() {
             std::vector<std::string> a {
@@ -144,9 +145,9 @@ glua::result<void> test_glua_instance(std::string input, glua::instance<Backend>
             return glue.template execute_script<std::string>(input).and_then([&](auto script_result) {
                 format_print("Script completed with result: {}\n", script_result);
                 // check which style of script
-                if (glue.template get_global<bool>("advanced_demonstration")) {
+                if (auto advanced_val = glue.template get_global<bool>("advanced_demonstration"); advanced_val.has_value() && advanced_val.value()) {
                     return advanced_test_glua_instance(glue);
-                } else if (glue.template get_global<bool>("advanced_demonstration")) {
+                } else if (auto basic_val = glue.template get_global<bool>("basic_demonstration"); basic_val.has_value() && basic_val.value()) {
                     return basic_test_glua_instance(glue);
                 } else {
                     format_print("Finished executing unrecognized script\n");

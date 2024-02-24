@@ -31,6 +31,16 @@ struct converter<T> {
     // from_js not supported, can't 'point' to JS bytes
 };
 
+template <decays_to<const char*> T>
+struct converter<T> {
+    static result<JS::Value> to_js(JSContext* cx, const char* v);
+
+    // from_js not supported, can't 'point' to JS bytes
+};
+
+template <decays_to<char*> T>
+struct converter<T> : converter<const char*> { };
+
 template <typename T>
 struct converter<std::vector<T>> {
     static result<JS::Value> to_js(JSContext* cx, std::vector<T>&& v);
@@ -140,10 +150,13 @@ struct converter<bool> {
 
 template <>
 struct converter<any> {
-    static result<JS::Value> to_js(JSContext* cx, any&& v);
+    static result<JS::Value> to_js(JSContext* cx, const any& v);
 
     static result<any> from_js(JSContext* cx, JS::HandleValue v);
 };
+
+template <decays_to<any> T>
+struct converter<T> : converter<std::decay_t<T>> { };
 
 template <decays_to_integral T>
 struct converter<T> : converter<std::decay_t<T>> { };

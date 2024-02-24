@@ -20,6 +20,9 @@ public:
         return Backend::create(std::forward<CreateArgs>(create_args)...).transform([&](auto backend_ptr) { return instance { std::move(backend_ptr) }; });
     }
 
+    result<typename Backend::sandbox> create_sandbox() { return backend_ptr_->create_sandbox(); }
+    auto set_active_sandbox(typename Backend::sandbox* s) { backend_ptr_->set_active_sandbox(s); }
+
     template <typename ReturnType>
     result<ReturnType> execute_script(const std::string& code)
     {
